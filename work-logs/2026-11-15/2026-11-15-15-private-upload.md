@@ -1,6 +1,6 @@
 # 작업: GitHub 최초 비공개 업로드 승인·인증 준비
 
-- 상태: 진행 중 — 최초 비공개 업로드 승인 완료, GitHub 브라우저 인증 대기
+- 상태: 사용자 확인 대기 — GitHub 비공개 최초 업로드 완료, Cloudflare 공개 배포 승인 대기
 - 구현 관련 파일: `PROGRESS.md`와 이 작업 기록. 게임 코드 변경 없음.
 
 ## 요청 사항
@@ -22,12 +22,16 @@
 - [x] 작성자 정보는 사용자 선택에 따라 로그인한 GitHub 계정명 + GitHub noreply 이메일을 저장소 로컬에만 설정한다. 개인 이메일을 임의 지정하거나 전역 설정을 바꾸지 않는다.
 - [x] `gh auth login --hostname github.com --git-protocol https --web --clipboard`로 공식 인증을 시작하고 브라우저를 열었다. 일회용 코드는 클립보드로 전달했으며 문서·채팅에 기록하지 않았다. 인증 완료는 아직 확인되지 않았다.
 - [x] 승인 파일 784개만 NUL 구분 경로 목록으로 stage했다. CRLF 변환으로 기존 파일 내용이 바뀌지 않도록 이 명령에서만 `core.autocrlf=false`를 사용했다. 시스템/전역 설정은 변경하지 않았으며 커밋·원격 저장소·업로드는 아직 없다. 진행 기록 갱신분 두 문서만 추가 stage 후 승인 목록·staged blob·작업 파일을 대조한다.
-- [ ] GitHub 공식 브라우저 인증과 작성자 확인 후 동명 저장소 조회·첫 비공개 업로드.
+- [x] GitHub 공식 브라우저 인증 완료를 CLI와 API에서 확인했다. 인증 계정은 `GimEun`이며 Windows keyring을 사용한다. 토큰을 파일·문서에 기록하지 않았다.
+- [x] GraphQL 저장소 조회와 REST 조회(404), 인증 계정 조회 성공을 함께 확인해 본인 계정에 기존 `eco-to-hero` 저장소가 없는 것을 확인했다. 기존 저장소를 덮어쓰지 않았다.
+- [x] 사용자 선택대로 GitHub 계정명과 ID 기반 noreply 작성자를 저장소 로컬에만 설정했다. 첫 커밋 `8d28b9d40b91ffb1ecadd2b3676e7b4cb290bd0c`를 만들고 `https://github.com/GimEun/eco-to-hero`를 Private로 생성했다. 생성 직후 `visibility: PRIVATE`, `isEmpty: true`를 확인한 뒤 첫 main push 성공을 확인했다.
+- [x] 승인된 경로 784개와 staged blob·작업 파일의 내용 일치를 확인한 후 업로드했다. 원본 승인 이후 변경은 진행 기록 두 문서뿐이다. 인증은 명령 단위 credential helper를 사용했고 개인 토큰을 명령 인자에 넣지 않았다.
+- [x] main·develop 원격 브랜치를 생성·업로드하고 기본 브랜치 main·visibility PRIVATE를 API로 재확인했다. 첫 게임 커밋의 양 원격 SHA와 로컬 SHA가 같고, 원격 파일 784개·전체 Git tree SHA도 일치했다. 최초 업로드 검증 결과는 `C:/Users/zmdk5/ETH-deployment-review/2026-11-15/remote-verification.json`에 보관한다. 이 진행 기록 갱신은 문서 커밋으로 두 브랜치에 함께 반영한다.
 - [ ] 별도 공개 배포 승인 후 Cloudflare Pages Git 연동·실제 배포 검증.
 
 ## 사용자 작업
 
 - [x] 검토한 파일 목록으로 본인 계정의 `eco-to-hero` Private 최초 업로드 승인.
-- [ ] PowerShell에서 공식 로그인: `& 'C:/Users/zmdk5/.local/share/eth-tools/gh/bin/gh.exe' auth login --hostname github.com --git-protocol https --web`
+- [x] 공식 GitHub 브라우저 인증: 사용자가 ‘Congratulations, you're all set! Your device is now connected.’ 화면을 확인했다고 전달했고 CLI에서도 로그인 완료를 확인했다.
   - 인증 코드·비밀번호·토큰을 채팅이나 문서에 기록하지 않는다.
   - 업로드 승인 후에도 기존 동명 저장소를 임의로 덮어쓰지 않으며 Cloudflare 공개 배포는 별도 승인받는다.
