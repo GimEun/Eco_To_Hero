@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import assert from 'node:assert/strict';
+const root = 'work-logs/2026-11-12';
+const previous = JSON.parse(fs.readFileSync(`${root}/shared-ranges-freeze.json`, 'utf8'));
+const selected = JSON.parse(fs.readFileSync(`${root}/risk-training/selected-choices.json`, 'utf8')).selected;
+selected.initial.warehouse.defense = 'forward'; selected.initial.research.attack = 'execute';
+for (const file of ['start-choice42-choices.json', 'start-choice42-freeze.json']) assert.ok(!fs.existsSync(`${root}/${file}`));
+fs.writeFileSync(`${root}/start-choice42-choices.json`, JSON.stringify({ selected, note: 'One preset candidate; warehouse initial defense forward and research initial attack execute. Other selections unchanged.' }, null, 2) + '\n');
+const files = [...Object.keys(previous.sha256), ...['shared-range42/opponent-diagnose-purchase-shared-range.json', 'start-choice42-choices.json', 'summarize-start-choice42.mjs', 'freeze-start-choice42.mjs'].map(file => `${root}/${file}`)];
+const sha256 = Object.fromEntries(files.map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')]));
+for (const [file, value] of Object.entries(previous.sha256)) assert.equal(sha256[file], value, file);
+fs.writeFileSync(`${root}/start-choice42-freeze.json`, JSON.stringify({ seeds: previous.seeds, newMaps: ['warehouse', 'research'], range: [42, 54], newConditions: 12, reusedConditions: 24, sha256 }, null, 2) + '\n');
+console.log(JSON.stringify({ frozenFiles: Object.keys(sha256).length, newConditions: 12 }));

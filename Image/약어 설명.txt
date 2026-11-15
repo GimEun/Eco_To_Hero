@@ -1,0 +1,24 @@
+Wo = Wolf
+P = Phnix
+D = Dragon
+L = Lion
+E = Eagle
+Be = Bear
+H = Hog
+Ho = Horse
+C = Cobra
+S = Shark
+
+R = Red
+B = Blue
+W = White
+Y = Yellow
+Bl = Black
+G = Green
+
+A = Asian
+Wi = White man
+Ba = Black man
+
+Ha = Hair
+Un = Uniform

@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.local
+.sites-runtime/
+.dev-server/
+.portrait-preview-chrome/
+.vite/
+.wrangler/
+coverage/
+*.log
+*.tmp
+*.part
+*.zip
+*.pem
+*.key
+.DS_Store
+Thumbs.db
+# Generated experiment reports stay local; source and work-log Markdown remain included.
+work-logs/**/*.json

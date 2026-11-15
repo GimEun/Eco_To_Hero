@@ -1,0 +1,116 @@
+{
+  "conditions": "양 팀 에임/지능 50·동일 무기·매 시드 진영 교환·라운드 경제 제외",
+  "startSeed": 128,
+  "seedCount": 32,
+  "defenseWins": 213,
+  "rounds": 512,
+  "defenseWinRate": 41.6,
+  "groups": [
+    {
+      "plan": "standard",
+      "site": "A",
+      "weapon": "basic-pistol",
+      "defenseWins": 19,
+      "rounds": 64,
+      "defenseWinRate": 29.7,
+      "reasons": {
+        "defense-eliminated": 45,
+        "attack-eliminated": 10,
+        "defused": 9
+      }
+    },
+    {
+      "plan": "standard",
+      "site": "A",
+      "weapon": "training-rifle",
+      "defenseWins": 27,
+      "rounds": 64,
+      "defenseWinRate": 42.2,
+      "reasons": {
+        "attack-eliminated": 26,
+        "defense-eliminated": 36,
+        "explosion": 1,
+        "defused": 1
+      }
+    },
+    {
+      "plan": "standard",
+      "site": "B",
+      "weapon": "basic-pistol",
+      "defenseWins": 20,
+      "rounds": 64,
+      "defenseWinRate": 31.3,
+      "reasons": {
+        "defense-eliminated": 43,
+        "attack-eliminated": 15,
+        "explosion": 1,
+        "defused": 5
+      }
+    },
+    {
+      "plan": "standard",
+      "site": "B",
+      "weapon": "training-rifle",
+      "defenseWins": 28,
+      "rounds": 64,
+      "defenseWinRate": 43.8,
+      "reasons": {
+        "defense-eliminated": 36,
+        "defused": 3,
+        "attack-eliminated": 25
+      }
+    },
+    {
+      "plan": "forward",
+      "site": "A",
+      "weapon": "basic-pistol",
+      "defenseWins": 26,
+      "rounds": 64,
+      "defenseWinRate": 40.6,
+      "reasons": {
+        "defense-eliminated": 38,
+        "defused": 9,
+        "attack-eliminated": 17
+      }
+    },
+    {
+      "plan": "forward",
+      "site": "A",
+      "weapon": "training-rifle",
+      "defenseWins": 15,
+      "rounds": 64,
+      "defenseWinRate": 23.4,
+      "reasons": {
+        "attack-eliminated": 15,
+        "defense-eliminated": 48,
+        "explosion": 1
+      }
+    },
+    {
+      "plan": "forward",
+      "site": "B",
+      "weapon": "basic-pistol",
+      "defenseWins": 43,
+      "rounds": 64,
+      "defenseWinRate": 67.2,
+      "reasons": {
+        "attack-eliminated": 36,
+        "defense-eliminated": 21,
+        "defused": 7
+      }
+    },
+    {
+      "plan": "forward",
+      "site": "B",
+      "weapon": "training-rifle",
+      "defenseWins": 35,
+      "rounds": 64,
+      "defenseWinRate": 54.7,
+      "reasons": {
+        "defense-eliminated": 29,
+        "attack-eliminated": 33,
+        "defused": 2
+      }
+    }
+  ]
+}

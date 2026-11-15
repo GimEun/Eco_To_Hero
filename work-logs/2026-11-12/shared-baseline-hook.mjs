@@ -1,0 +1,8 @@
+import { registerHooks } from 'node:module';
+import { includeFixedProfile } from './shared-baseline-transform.mjs';
+const calibration = new URL('../../scripts/calibrate-opponent-strategy.js', import.meta.url).href;
+registerHooks({ load(url, context, nextLoad) {
+  const result = nextLoad(url, context);
+  if (url !== calibration) return result;
+  return { ...result, source: includeFixedProfile(String(result.source).replace(/\r\n/g, '\n')) };
+} });

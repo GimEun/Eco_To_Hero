@@ -1,0 +1,3 @@
+// 시 리그 공개 함수 이름과 결정전 ID는 그대로 보존한다.
+export const CITY_PLAYOFF_WEEK_ID='city-1-playoffs';
+export { domesticFixtures as cityFixtures,domesticProgress as cityProgress,ensureDomesticTiebreakRound as ensureCityTiebreakRound,nextDomesticTiebreak as nextCityTiebreak,recordDomesticTiebreak as recordCityTiebreak,createDomesticPlayoffs as createCityPlayoffs,recordDomesticPlayoffMap as recordCityPlayoffMap,validateDomesticFinals as validateCityFinals } from './domestic-finals.js';

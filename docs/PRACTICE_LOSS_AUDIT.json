@@ -1,0 +1,412 @@
+{
+  "worldSeed": 42,
+  "home": {
+    "name": "원인 조사",
+    "average": {
+      "aim": 44,
+      "intelligence": 43.8
+    }
+  },
+  "away": {
+    "id": "club-ai-01",
+    "name": "노을 섬광",
+    "average": {
+      "aim": 38.2,
+      "intelligence": 45
+    }
+  },
+  "identicalReplay": true,
+  "matchesRun": 31,
+  "results": [
+    {
+      "map": "relay",
+      "firstSide": "attack",
+      "homeBuys": false,
+      "seed": 42,
+      "equalStats": false,
+      "score": "1:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 0,
+        "away": 55
+      }
+    },
+    {
+      "map": "relay",
+      "firstSide": "attack",
+      "homeBuys": true,
+      "seed": 42,
+      "equalStats": false,
+      "score": "8:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 89,
+        "away": 90
+      }
+    },
+    {
+      "map": "relay",
+      "firstSide": "defense",
+      "homeBuys": false,
+      "seed": 42,
+      "equalStats": false,
+      "score": "2:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 0,
+        "away": 60
+      }
+    },
+    {
+      "map": "relay",
+      "firstSide": "defense",
+      "homeBuys": true,
+      "seed": 42,
+      "equalStats": false,
+      "score": "13:8",
+      "winner": "home",
+      "riflePlayerRounds": {
+        "home": 84,
+        "away": 76
+      }
+    },
+    {
+      "map": "warehouse",
+      "firstSide": "attack",
+      "homeBuys": false,
+      "seed": 42,
+      "equalStats": false,
+      "score": "2:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 0,
+        "away": 60
+      }
+    },
+    {
+      "map": "warehouse",
+      "firstSide": "attack",
+      "homeBuys": true,
+      "seed": 42,
+      "equalStats": false,
+      "score": "13:2",
+      "winner": "home",
+      "riflePlayerRounds": {
+        "home": 65,
+        "away": 39
+      }
+    },
+    {
+      "map": "warehouse",
+      "firstSide": "defense",
+      "homeBuys": false,
+      "seed": 42,
+      "equalStats": false,
+      "score": "2:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 0,
+        "away": 60
+      }
+    },
+    {
+      "map": "warehouse",
+      "firstSide": "defense",
+      "homeBuys": true,
+      "seed": 42,
+      "equalStats": false,
+      "score": "13:7",
+      "winner": "home",
+      "riflePlayerRounds": {
+        "home": 83,
+        "away": 78
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "attack",
+      "homeBuys": false,
+      "seed": 42,
+      "equalStats": false,
+      "score": "2:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 0,
+        "away": 60
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "attack",
+      "homeBuys": true,
+      "seed": 42,
+      "equalStats": false,
+      "score": "8:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 79,
+        "away": 88
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "defense",
+      "homeBuys": false,
+      "seed": 42,
+      "equalStats": false,
+      "score": "0:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 0,
+        "away": 55
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "defense",
+      "homeBuys": true,
+      "seed": 42,
+      "equalStats": false,
+      "score": "25:21",
+      "winner": "home",
+      "riflePlayerRounds": {
+        "home": 201,
+        "away": 198
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "attack",
+      "homeBuys": false,
+      "seed": 1,
+      "equalStats": false,
+      "score": "3:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 0,
+        "away": 65
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "attack",
+      "homeBuys": true,
+      "seed": 1,
+      "equalStats": false,
+      "score": "13:1",
+      "winner": "home",
+      "riflePlayerRounds": {
+        "home": 60,
+        "away": 34
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "defense",
+      "homeBuys": false,
+      "seed": 1,
+      "equalStats": false,
+      "score": "2:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 0,
+        "away": 60
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "defense",
+      "homeBuys": true,
+      "seed": 1,
+      "equalStats": false,
+      "score": "13:10",
+      "winner": "home",
+      "riflePlayerRounds": {
+        "home": 85,
+        "away": 81
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "attack",
+      "homeBuys": false,
+      "seed": 2,
+      "equalStats": false,
+      "score": "3:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 0,
+        "away": 65
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "attack",
+      "homeBuys": true,
+      "seed": 2,
+      "equalStats": false,
+      "score": "14:16",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 121,
+        "away": 119
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "defense",
+      "homeBuys": false,
+      "seed": 2,
+      "equalStats": false,
+      "score": "2:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 0,
+        "away": 60
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "defense",
+      "homeBuys": true,
+      "seed": 2,
+      "equalStats": false,
+      "score": "13:8",
+      "winner": "home",
+      "riflePlayerRounds": {
+        "home": 90,
+        "away": 85
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "attack",
+      "homeBuys": false,
+      "seed": 3,
+      "equalStats": false,
+      "score": "0:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 0,
+        "away": 55
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "attack",
+      "homeBuys": true,
+      "seed": 3,
+      "equalStats": false,
+      "score": "13:4",
+      "winner": "home",
+      "riflePlayerRounds": {
+        "home": 70,
+        "away": 54
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "defense",
+      "homeBuys": false,
+      "seed": 3,
+      "equalStats": false,
+      "score": "2:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 0,
+        "away": 60
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "defense",
+      "homeBuys": true,
+      "seed": 3,
+      "equalStats": false,
+      "score": "13:1",
+      "winner": "home",
+      "riflePlayerRounds": {
+        "home": 60,
+        "away": 40
+      }
+    },
+    {
+      "map": "relay",
+      "firstSide": "attack",
+      "homeBuys": true,
+      "seed": 42,
+      "equalStats": true,
+      "score": "10:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 88,
+        "away": 92
+      }
+    },
+    {
+      "map": "relay",
+      "firstSide": "defense",
+      "homeBuys": true,
+      "seed": 42,
+      "equalStats": true,
+      "score": "2:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 40,
+        "away": 60
+      }
+    },
+    {
+      "map": "warehouse",
+      "firstSide": "attack",
+      "homeBuys": true,
+      "seed": 42,
+      "equalStats": true,
+      "score": "13:8",
+      "winner": "home",
+      "riflePlayerRounds": {
+        "home": 84,
+        "away": 75
+      }
+    },
+    {
+      "map": "warehouse",
+      "firstSide": "defense",
+      "homeBuys": true,
+      "seed": 42,
+      "equalStats": true,
+      "score": "13:5",
+      "winner": "home",
+      "riflePlayerRounds": {
+        "home": 80,
+        "away": 65
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "attack",
+      "homeBuys": true,
+      "seed": 42,
+      "equalStats": true,
+      "score": "11:13",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 103,
+        "away": 103
+      }
+    },
+    {
+      "map": "research",
+      "firstSide": "defense",
+      "homeBuys": true,
+      "seed": 42,
+      "equalStats": true,
+      "score": "15:19",
+      "winner": "away",
+      "riflePlayerRounds": {
+        "home": 150,
+        "away": 154
+      }
+    }
+  ]
+}

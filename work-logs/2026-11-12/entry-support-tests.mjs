@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createClub } from '../../src/game/create-club.js';
+import { createWorld } from '../../src/game/create-world.js';
+import { getClubView } from '../../src/game/world-selectors.js';
+import { createPractice } from '../../src/simulation/practice.js';
+import { PRACTICE_MAPS } from '../../src/data/maps/index.js';
+import { observeEntrySupport, captureEntrySupport, entrySupportSummary } from './entry-support-observer.mjs';
+test('entry support inspection does not alter state/RNG and copied events remain isolated', () => {
+  const world = createWorld(createClub('Entry').club, 73), home = getClubView(world);
+  const away = getClubView(world, world.clubs.find(club => club.leagueId === 'pc' && club.id !== world.playerClubId).id);
+  const map = PRACTICE_MAPS.find(map => map.id === 'research');
+  const state = createPractice(map, home, away, { match: true, seed: 73, attackTeam: 'home', attackPlans: { home: 'split', away: 'execute' } });
+  const before = structuredClone(state);
+  observeEntrySupport(state, map); captureEntrySupport(state);
+  assert.deepEqual(state, before); assert.equal(Object.keys(entrySupportSummary(state).supports).length, 2);
+  state.events.push({ type: 'attack-entry', tick: 1, reason: 'entry-contact' });
+  captureEntrySupport(state); captureEntrySupport(state);
+  const copy = entrySupportSummary(state); assert.equal(copy.events.length, 1); copy.events[0].reason = 'bad';
+  assert.equal(entrySupportSummary(state).events[0].reason, 'entry-contact');
+  state.economy.roundNumber = 2; assert.equal(entrySupportSummary(state), null);
+});

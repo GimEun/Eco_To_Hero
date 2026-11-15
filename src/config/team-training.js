@@ -1,0 +1,1 @@
+export const TEAM_TRAINING_MODES = Object.freeze({ movement: { label: '이동·시야', experience: 10 }, combat: { label: '교전 연습', experience: 25 }, round: { label: '한 라운드·폭탄', experience: 40 }, economy: { label: '구매·라운드', experience: 50 }, match: { label: 'MR12 경기', experience: 120 } });

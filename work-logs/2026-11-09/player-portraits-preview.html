@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>선수 초상화 조합 확인</title><link rel="stylesheet" href="/src/styles.css">
+<style>
+  body { padding: 28px; margin: 0; }
+  main { max-width: 1450px; margin: auto; }
+  h1 { font-size: 24px; } h2 { font-size: 17px; margin: 22px 0 14px; }
+  .samples { display: flex; gap: 18px; flex-wrap: wrap; }
+  .sample { text-align: center; color: #c3cde1; font-size: 13px; }
+  .sample .player-portrait { --portrait-size: 150px; margin-bottom: 6px; }
+  .faces .player-portrait { --portrait-size: 115px; }
+  .reference { width: 150px; height: 150px; object-fit: cover; border-radius: 8px; border: 1px solid #4b5875; }
+  .roster-table { width: 100%; }
+</style>
+<main><h1>제공 에셋으로 조합한 선수 초상화</h1><p>머리·얼굴·유니폼 원본을 CSS로 겹친 확인용 화면</p>
+<h2>머리 없음 · 머리 5종과 참고 이미지</h2><div id="hair" class="samples"></div>
+<h2>얼굴 9종 · 유니폼 5색</h2><div id="faces" class="samples faces"></div>
+<h2>실제 명단 — 선수 이름 오른쪽</h2><div id="roster"></div></main>
+<script type="module">
+import { playerPortrait } from '/src/ui/player-portrait.js';
+import { PLAYER_FACES, PLAYER_HAIR, PLAYER_UNIFORMS } from '/src/data/player-portraits.js';
+import { rosterTable } from '/src/ui/screens.js';
+import { createWorld } from '/src/game/create-world.js';
+import { createClub } from '/src/game/create-club.js';
+import { getAffiliations } from '/src/game/world-selectors.js';
+const sample = (faceId, hairId, uniformId) => playerPortrait({ nickname: '선수', appearance: { faceId, hairId, uniformId } });
+document.querySelector('#hair').innerHTML = PLAYER_HAIR.map(hair => `<div class="sample">${sample('A_1', hair.id, 'Un_B')}${hair.id === 'none' ? '머리 없음' : hair.id}</div>`).join('') + '<div class="sample"><img class="reference" src="/Image/선수%20래퍼런스.png"><div>제공 참고 이미지</div></div>';
+document.querySelector('#faces').innerHTML = PLAYER_FACES.map((face, i) => `<div class="sample">${sample(face.id, PLAYER_HAIR[i % PLAYER_HAIR.length].id, PLAYER_UNIFORMS[i % 5].id)}${face.id} · ${PLAYER_UNIFORMS[i % 5].id}</div>`).join('');
+const world = createWorld(createClub('조합 확인').club, 42);
+const affiliations = getAffiliations(world);
+document.querySelector('#roster').innerHTML = rosterTable(world.players.filter(player => !affiliations.has(player.id)).slice(0, 3), affiliations, 0, () => '<button class="button secondary">영입</button>');
+document.querySelectorAll('img').forEach(img => img.loading = 'eager');
+await Promise.all([...document.images].map(img => img.decode().catch(() => {})));
+document.documentElement.dataset.ready = 'true';
+</script></html>

@@ -1,0 +1,13 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PC방 시즌 일정·순위 확인</title>
+<link rel="stylesheet" href="/src/styles.css"><style>body {padding:28px;margin:0} #preview {max-width:1360px;margin:auto} .preview-label {color:#bdc9df;font-size:13px;margin-bottom:16px}</style>
+<main id="preview"><p class="preview-label">일정·순위 확인용 화면 · 실제 저장은 읽거나 변경하지 않습니다.</p></main>
+<script type="module">
+import {seasonScreen} from '/src/ui/season-screen.js';
+import {createWorld} from '/src/game/create-world.js';
+import {createClub} from '/src/game/create-club.js';
+const world=createWorld(createClub('PC방 시즌 확인').club,42);
+document.querySelector('#preview').append(seasonScreen(world));
+document.querySelectorAll('img').forEach(img=>img.loading='eager');
+await Promise.all([...document.images].map(img=>img.decode().catch(()=>{})));
+document.documentElement.dataset.ready='true';
+</script></html>

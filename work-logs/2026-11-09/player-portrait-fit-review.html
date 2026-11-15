@@ -1,0 +1,10 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>머리 크기·위치 확인</title>
+<link rel="stylesheet" href="/src/styles.css">
+<style>body {padding:24px} main {width:1200px;margin:auto} .refs,.samples {display:flex;gap:24px;margin:20px 0} .refs img {width:316px;height:240px;object-fit:contain;image-rendering:pixelated;background:#151b29} .player-portrait {--portrait-size:220px} .sample {text-align:center} h1 {font-size:24px}</style>
+<main><h1>사용자 캡처</h1><div class="refs"><img src="/iwdnoiuwqandouiaw2.jpg"><img src="/iwdnoiuwqandouiaw.jpg"></div><h1>원본 머리별 조합</h1><div id="samples" class="samples"></div></main>
+<script type="module">
+import {playerPortrait} from '/src/ui/player-portrait.js';
+document.querySelector('#samples').innerHTML=['Ha_2','Ha_5','Ha_7'].map(hairId=>`<div class="sample">${playerPortrait({nickname:hairId,appearance:{faceId:'Ba_1',hairId,uniformId:'Un_Bl'}})}<p>${hairId}</p></div>`).join('');
+document.querySelectorAll('img').forEach(img=>img.loading='eager');
+await Promise.all([...document.images].map(img=>img.decode().catch(()=>{})));
+</script></html>

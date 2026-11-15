@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createWorld } from '../../src/game/create-world.js';
+import { createClub } from '../../src/game/create-club.js';
+import { getClubView } from '../../src/game/world-selectors.js';
+import { createPractice } from '../../src/simulation/practice.js';
+import { PRACTICE_MAPS } from '../../src/data/maps/index.js';
+import { observeOpening, captureOpeningEvents, openingSummary } from './opening-engagement.mjs';
+import { observeRetreat, captureRetreat, retreatSummary } from './retreat-observer.mjs';
+test('research attacking opening uses both observers without state/RNG mutation and excludes later rounds', () => {
+  const world = createWorld(createClub('Research').club, 73), home = getClubView(world);
+  const away = getClubView(world, world.clubs.find(club => club.leagueId === 'pc' && club.id !== world.playerClubId).id);
+  const map = PRACTICE_MAPS.find(map => map.id === 'research');
+  const state = createPractice(map, home, away, { match: true, seed: 73, attackTeam: 'home' });
+  const before = structuredClone(state);
+  observeOpening(state, map); observeRetreat(state, map); captureOpeningEvents(state); captureRetreat(state);
+  assert.deepEqual(state, before); assert.equal(Object.keys(openingSummary(state).actors).length, 10);
+  assert.equal(retreatSummary(state).transitions.length, 10);
+  state.economy.roundNumber = 2; assert.equal(openingSummary(state), null); assert.equal(retreatSummary(state), null);
+});
