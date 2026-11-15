@@ -170,6 +170,7 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
   function showResult() {
     if (resultShown || !state.complete || state.match && !state.match.complete) return;
     resultShown = true;
+    if (mapExpanded) onExpandMap();
     const winner = state.match?.winner ?? state.winner;
     resultDialog.dataset.outcome = winner === 'home' ? 'win' : winner === 'away' ? 'loss' : 'neutral';
     screen.querySelector('#practice-result-title').textContent = `${official ? bo3 ? `${seriesLabel} 맵` : '공식 경기' : '팀 연습'} ${winner === 'home' ? '승리' : winner === 'away' ? '패배' : '종료'}`;

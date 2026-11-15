@@ -558,6 +558,30 @@ test('경기 규칙은 별도 창에서 열고 닫은 뒤 다시 열 수 있으�
   assert.deepEqual(f.world, before);
 });
 
+for (const expanded of [false, true]) test(`공식 경기 종료 후 ${expanded ? '확대' : '일반'} 화면의 메뉴 잠금을 원래대로 복원한다`, async t => {
+  const f = fixture(t, 'match', false, true);
+  const background = ['sidebar', 'topbar', 'footer'].map(name => f.get(`.background-${name}`));
+  const original = [false, false, true];
+  background.forEach((element, index) => { element.inert = original[index]; });
+  f.screen.closest = () => ({ querySelectorAll: () => background });
+  if (expanded) {
+    f.get('[data-practice="expand-map"]').emit('click');
+    assert.ok(background.every(element => element.inert));
+  }
+  let rounds = 0;
+  while (!f.get('[data-practice="toggle"]').disabled && rounds++ < 150) f.playRound();
+  await Promise.resolve();
+  assert.equal(f.officialResults.length, 1);
+  assert.equal(f.get('.practice-result-dialog').open, true);
+  assert.equal(f.screen.classList.contains('is-expanded'), false);
+  assert.equal(f.get('.practice-map-wrap').classList.contains('is-expanded'), false);
+  assert.deepEqual(background.map(element => element.inert), original);
+  f.get('[data-practice="close-result"]').emit('click');
+  assert.equal(f.get('.practice-result-dialog').open, false);
+  assert.deepEqual(background.map(element => element.inert), original);
+  assert.deepEqual(f.world, f.original);
+});
+
 test('지도 확대는 버튼 재클릭과 Esc로 복귀하고 구매 준비·선수 선택 상태를 유지한다', t => {
   const f = fixture(t), button = f.get('[data-practice="expand-map"]'), map = f.get('.practice-map-wrap');
   const initial = f.get('[data-practice="toggle"]').textContent, player = f.get('#practice-player').value;
