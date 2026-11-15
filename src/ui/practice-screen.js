@@ -60,7 +60,7 @@ export function practiceScreen() {
   return screen;
 }
 
-export function mountPractice(screen, world, { onTrainingReward = () => {}, official = null, onOfficialComplete = async () => {} } = {}) {
+export function mountPractice(screen, world, { onTrainingReward = () => {}, official = null, onOfficialComplete = async () => {}, onCounselingRequired = null } = {}) {
   const bo3 = Boolean(official?.series || official?.playoff);
   const seriesLabel=official?.seriesLength===5?'BO5':'BO3';
   for(const button of screen.querySelectorAll('[data-action="next-playoff-map"]'))button.textContent=`${seriesLabel} 다음 맵 →`;
@@ -189,6 +189,10 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
         const counselButton=screen.querySelector('[data-action="open-counseling"]');
         counselButton.hidden=Boolean(response?.nextMap || !response?.counselCount);
         if(response?.counselCount)counselButton.textContent=`선수 상담 ${response.counselCount}건`;
+        if(!response?.nextMap && response?.counselCount && onCounselingRequired) {
+          if(resultDialog.open)resultDialog.close();
+          onCounselingRequired();
+        }
       }).catch(error => { message.textContent = `결과 저장 실패: ${error.message} · 다른 화면으로 이동하면 저장을 다시 시도합니다.`; });
       return;
     }

@@ -109,6 +109,48 @@ function domFixture(t,{showError=false}={}) {
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 
+test('필수 상담은 나중에·Esc·구단 이동을 막고 답변 선택은 허용한다',async t=>{
+  const f=domFixture(t),world=pendingWorld();let clubs=0,answers=0;
+  openCounselingDialog({getWorld:()=>world,required:true,onClub(){clubs++;},onAnswer(id,choice){answers++;assert.equal(answerCounseling(world,id,choice).ok,true);}});
+  assert.doesNotMatch(f.dialog.innerHTML,/data-counsel="later"/);
+  assert.match(f.dialog.innerHTML,/data-counsel="club" disabled/);
+  assert.equal(f.dialog.escape(),true);
+  f.dialog.click('later');f.dialog.click('club');
+  assert.equal(f.dialog.open,true);assert.equal(clubs,0);
+  f.dialog.click('answer','encourage');await flush();
+  assert.equal(answers,1);trip(world);
+});
+
+test('여러 필수 상담은 전부 답변한 뒤에만 닫거나 구단으로 갈 수 있다',async t=>{
+  const f=domFixture(t);let world;
+  for(let seed=0;seed<100;seed++){
+    const candidate=counselWorld(seed);
+    for(let game=0;game<7;game++){const fixture=finishCounselFixture(candidate);evaluateCounseling(candidate,fixture.id);}
+    if(availableCounsels(candidate).length>=3){world=candidate;break;}
+  }
+  assert.ok(world);const count=availableCounsels(world).length;let answers=0,clubs=0;
+  openCounselingDialog({getWorld:()=>world,required:true,onClub(){clubs++;},onAnswer(id,choice){answers++;assert.equal(answerCounseling(world,id,choice).ok,true);}});
+  while(availableCounsels(world).length){
+    assert.equal(f.dialog.escape(),true);
+    f.dialog.click('answer','encourage');await flush();
+    if(availableCounsels(world).length){f.dialog.click('club');assert.equal(clubs,0);f.dialog.click('next');}
+  }
+  assert.equal(answers,count);assert.match(f.dialog.innerHTML,/data-counsel="later"/);
+  f.dialog.click('club');assert.equal(clubs,1);assert.equal(f.dialog.open,false);trip(world);
+});
+
+test('필수 상담 저장 실패는 기존 대기를 보존하고 재시도 전 이탈을 허용하지 않는다',async t=>{
+  const f=domFixture(t);let world=pendingWorld(),attempts=0;const before=structuredClone(world);
+  openCounselingDialog({getWorld:()=>world,required:true,onClub(){assert.fail('left pending counsel');},async onAnswer(id,choice){
+    attempts++;const candidate=structuredClone(world);answerCounseling(candidate,id,choice);
+    if(attempts===1)throw Error('저장 실패 재현');world=candidate;
+  }});
+  f.dialog.click('answer','advise');await flush();
+  assert.deepEqual(world,before);assert.match(f.dialog.innerHTML,/저장 실패 재현/);
+  assert.equal(f.dialog.escape(),true);f.dialog.click('later');f.dialog.click('club');assert.equal(f.dialog.open,true);
+  f.dialog.click('answer','advise');await flush();assert.equal(attempts,2);assert.match(f.dialog.innerHTML,/선수의 반응/);trip(world);
+});
+
 test('Esc와 나중에는 답변하지 않고 대기 상태를 보존한다',t=>{
   const f=domFixture(t),world=pendingWorld(),before=structuredClone(world);let answers=0,closes=0;
   openCounselingDialog({getWorld:()=>world,onAnswer:()=>answers++,onClub(){},onClose:()=>closes++});

@@ -69,6 +69,7 @@ let disposePractice = null;
 let officialFixture = null;
 let officialScore = null;
 let officialSettlement = null;
+let counselDialog = null;
 let weeklyActionPurpose = 'week';
 
 const yieldMatchWork = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -141,8 +142,9 @@ async function startOfficial() {
 
 function openCounseling(id=null) {
   if(!world || bankruptcyIssue(world))return;
+  if(counselDialog?.isConnected && counselDialog.open)return counselDialog;
   const trigger=document.activeElement;
-  return openCounselingDialog({getWorld:()=>world,id,
+  const dialog=openCounselingDialog({getWorld:()=>world,id,required:availableCounsels(world).length>0,
     onAnswer:async(counselId,choiceId)=>{
       if(busy)throw new Error('다른 저장 작업이 끝난 뒤 다시 선택해 주세요.');
       setBusy(true);
@@ -163,6 +165,15 @@ function openCounseling(id=null) {
       else main.querySelector('.practice-result-buttons [data-action="club"]')?.focus({preventScroll:true});
     },
   });
+  counselDialog=dialog;
+  dialog?.addEventListener('close',()=>{if(counselDialog===dialog)counselDialog=null;},{once:true});
+  return dialog;
+}
+
+function requirePendingCounseling() {
+  if(!world || bankruptcyIssue(world) || !availableCounsels(world).length)return false;
+  openCounseling();
+  return true;
 }
 
 window.addEventListener('beforeunload', event => {
@@ -244,7 +255,7 @@ async function runOperation(operation) {
   catch (error) { notify(error.message || '작업을 완료하지 못했습니다.', true); }
   finally {
     setBusy(false);
-    (main.querySelector('#club-name') ?? main.querySelector('h1'))?.focus({ preventScroll: true });
+    if(!requirePendingCounseling())(main.querySelector('#club-name') ?? main.querySelector('h1'))?.focus({ preventScroll: true });
   }
 }
 
@@ -290,6 +301,7 @@ function render(screenName, focusSelector = null) {
   if (screenName === 'official') disposePractice = mountPractice(screen, world, {
     official: createOfficialPractice(world, officialFixture),
     onOfficialComplete: score => settleOfficial(score),
+    onCounselingRequired: requirePendingCounseling,
   });
   document.title = `${GAME.title} · ${screenName === 'club' && club ? club.name : '구단 경영'}`;
   for (const button of app.querySelectorAll('.nav-button')) {
@@ -472,6 +484,7 @@ app.addEventListener('click', (event) => {
   if (!button || button.disabled) return;
   const action = button.dataset.action;
   if (busy) return;
+  if(requirePendingCounseling())return;
   if(action==='open-counseling'){openCounseling(button.dataset.counselId??null);return;}
   if (action === 'start-year-advance') {
     if (!world || yearAdvanceIssue(world)) return;

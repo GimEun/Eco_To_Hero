@@ -7,7 +7,7 @@ import { beginTeamTraining } from '../src/game/team-training.js';
 import { nextOfficialFixture, createOfficialPractice } from '../src/game/official-match.js';
 
 // 화면 제어를 Node에서 검증하는 최소 DOM/Canvas 경계. 브라우저 배치 검증은 하지 않는다.
-function fixture(t, mode = 'match', teamTraining = false, official = false) {
+function fixture(t, mode = 'match', teamTraining = false, official = false, officialResponse = undefined) {
   class Element {
     style = {};
     classList = {
@@ -69,12 +69,14 @@ function fixture(t, mode = 'match', teamTraining = false, official = false) {
   const original = structuredClone(world);
   const rewardMessages = [];
   const officialResults = [];
+  const counselRequests = [];
   const dispose = mountPractice(screen, world, { onTrainingReward: message => rewardMessages.push(message),
     official: official ? { ...createOfficialPractice(world, nextOfficialFixture(world)), ...(['playoff','bo5'].includes(official) ? { playoff:true, seriesScore:{home:1,away:0}, mapNumber:2, pausesRemaining:1 } : {}), ...(official==='bo5'?{seriesLength:5}: {}) } : null,
-    onOfficialComplete: async score => { officialResults.push(score); } });
+    onOfficialComplete: async score => { officialResults.push(score); return officialResponse; },
+    onCounselingRequired: () => { counselRequests.push(true); } });
   t.after(() => { try { dispose(); } finally { for (const restore of restoreGlobals) restore(); } });
   const get = key => screen.querySelector(key);
-  return { get, screen, world, original, frames, rewardMessages, officialResults,
+  return { get, screen, world, original, frames, rewardMessages, officialResults, counselRequests,
     frame(elapsedMs) {
       now += elapsedMs;
       const [id, callback] = frames.entries().next().value;
@@ -92,6 +94,20 @@ function fixture(t, mode = 'match', teamTraining = false, official = false) {
       assert.equal(frames.size, 0);
     },
   };
+}
+
+for (const response of [{ counselCount: 2 }, { counselCount: 0 }, { counselCount: 2, nextMap: true }]) {
+  test(`공식 경기 저장 후 상담 ${response.counselCount}건·다음 맵 ${Boolean(response.nextMap)}의 자동 상담 연결`, async t => {
+    const f = fixture(t, 'match', false, true, response);
+    let rounds = 0;
+    while (!f.get('[data-practice="toggle"]').disabled && rounds++ < 150) f.playRound();
+    await Promise.resolve();
+    const required = response.counselCount > 0 && !response.nextMap;
+    assert.equal(f.counselRequests.length, required ? 1 : 0);
+    assert.equal(f.get('.practice-result-dialog').open, !required);
+    assert.equal(f.officialResults.length, 1);
+    assert.deepEqual(f.world, f.original);
+  });
 }
 
 test('다음 상대 버튼은 같은 리그를 중복 없이 순환하고 설정 변경은 상대를 유지한다', t => {
