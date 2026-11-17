@@ -99,7 +99,7 @@ test('v8 저장·JSON 복원은 날짜·잔여일을 보존하고 v4는 기존 �
   renewContract(world, club.playerIds[0], 168);
   for (let i = 0; i < 7; i++) advanceDay(world);
   const saved = createSave(world);
-  assert.equal(saved.schemaVersion, 47);
+  assert.equal(saved.schemaVersion, 48);
   assert.equal(world.day, 8);
   assert.equal(club.contracts[club.playerIds[0]].remainingDays, 161);
   assert.deepEqual(restoreWorld(parseBackup(JSON.stringify(saved))), world);

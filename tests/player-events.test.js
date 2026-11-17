@@ -165,7 +165,7 @@ test('v11 변환은 행복도·행동·능력·재정·주간 잔여를 보존�
   assert.deepEqual(old, before);
   const { playerEvents, ...rest } = restored; assert.deepEqual(rest, { ...old.world, players:old.world.players.map(player=>({...player,fatigue:0})), aiGrowth:createAiGrowth(world.day),counseling:createCounseling(world), stocks: createStockMarket(world.seed,world.day) });
   assert.deepEqual(playerEvents, createPlayerEvents(world.seed));
-  assert.deepEqual(restoreWorld(createSave(restored)), restored); assert.equal(createSave(restored).schemaVersion, 47);
+  assert.deepEqual(restoreWorld(createSave(restored)), restored); assert.equal(createSave(restored).schemaVersion, 48);
 });
 
 test('손상된 이벤트·대상·확률·중복 이력·효과·주간 경계는 저장에서 거부한다', () => {

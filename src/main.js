@@ -82,6 +82,19 @@ async function persistOfficial(candidate) {
   isSaved = true;
 }
 
+async function saveStrategyLibrary(library) {
+  if (busy) throw new Error('다른 저장 작업이 끝난 뒤 다시 보관하세요.');
+  setBusy(true);
+  try {
+    const candidate = structuredClone(world);
+    candidate.strategyLibrary = library;
+    const entry = await writeSavedGame(createSave(candidate), loadedRevision);
+    // 관전·훈련 화면이 참조하는 세계 객체를 유지한다.
+    world.strategyLibrary = library;
+    savedEntry = entry; loadedRevision = entry.revision; isSaved = true;
+  } finally { setBusy(false); }
+}
+
 async function progressYearAdvance() {
   let cancelled = false;
   let failure = null;
@@ -289,7 +302,7 @@ function render(screenName, focusSelector = null) {
     }
   }
   if (screenName === 'club' && club && !bankruptcyIssue(world)) mountFinanceSections(screen, id => { selectedFinanceSection = id; });
-  if (screenName === 'practice') disposePractice = mountPractice(screen, world, { onTrainingReward: message => {
+  if (screenName === 'practice') disposePractice = mountPractice(screen, world, { onStrategySave: saveStrategyLibrary, onTrainingReward: message => {
     isSaved = false;
     if (activeYearAdvance(world)) void runOperation(async () => {
       const candidate = structuredClone(world);
@@ -299,6 +312,7 @@ function render(screenName, focusSelector = null) {
     notify(message);
   } });
   if (screenName === 'official') disposePractice = mountPractice(screen, world, {
+    onStrategySave: saveStrategyLibrary,
     official: createOfficialPractice(world, officialFixture),
     onOfficialComplete: score => settleOfficial(score),
     onCounselingRequired: requirePendingCounseling,

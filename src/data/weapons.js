@@ -1,20 +1,20 @@
 export const TRAINING_RIFLE = Object.freeze({
-  id: 'training-rifle', name: '돌격소총', range: 200,
+  id: 'training-rifle', name: '돌격소총', range: 200, moveMultiplier: 1,
   damage: 34, intervalTicks: 6, magazineSize: 30, reloadTicks: 40, price: 2700,
 });
 
 export const BASIC_PISTOL = Object.freeze({
-  id: 'basic-pistol', name: '기본 권총', range: 160,
+  id: 'basic-pistol', name: '기본 권총', range: 160, moveMultiplier: 1.1,
   damage: 22, intervalTicks: 10, magazineSize: 12, reloadTicks: 30, price: 0,
 });
 
 export const WEAPONS = Object.freeze([
   BASIC_PISTOL,
-  Object.freeze({ id: 'smg', name: '기관단총', price: 1500, range: 150, damage: 23, intervalTicks: 4, magazineSize: 30, reloadTicks: 36, movingPenalty: 0.07 }),
-  Object.freeze({ id: 'machine-gun', name: '기관총', price: 4000, range: 210, damage: 30, intervalTicks: 5, magazineSize: 80, reloadTicks: 80, movingPenalty: 0.28 }),
+  Object.freeze({ id: 'smg', name: '기관단총', price: 1500, range: 150, moveMultiplier: 1.15, damage: 23, intervalTicks: 4, magazineSize: 30, reloadTicks: 36, movingPenalty: 0.07 }),
+  Object.freeze({ id: 'machine-gun', name: '기관총', price: 4000, range: 210, moveMultiplier: 0.8, damage: 30, intervalTicks: 5, magazineSize: 80, reloadTicks: 80, movingPenalty: 0.28 }),
   TRAINING_RIFLE,
-  Object.freeze({ id: 'shotgun', name: '산탄총', price: 1800, range: 120, damage: 80, intervalTicks: 20, magazineSize: 8, reloadTicks: 50 }),
-  Object.freeze({ id: 'sniper', name: '저격소총', price: 4750, range: 300, damage: 100, intervalTicks: 32, magazineSize: 5, reloadTicks: 60, movingPenalty: 0.4 }),
+  Object.freeze({ id: 'shotgun', name: '산탄총', price: 1800, range: 120, moveMultiplier: 0.95, damage: 80, intervalTicks: 20, magazineSize: 8, reloadTicks: 50 }),
+  Object.freeze({ id: 'sniper', name: '저격소총', price: 4750, range: 300, moveMultiplier: 0.85, damage: 100, intervalTicks: 32, magazineSize: 5, reloadTicks: 60, movingPenalty: 0.4 }),
 ]);
 
 export const BODY_ARMOR = Object.freeze({ price: 650, durability: 100, reduction: 0.25 });
@@ -27,6 +27,10 @@ export function weaponDamage(weapon, distance) {
 
 export function weaponFor(actor) {
   return WEAPONS.find(weapon => weapon.id === actor.weaponId) ?? TRAINING_RIFLE;
+}
+
+export function movementSpeed(actor) {
+  return actor.speed * (weaponFor(actor).moveMultiplier ?? 1);
 }
 
 export const COMBAT_LIMIT_TICKS = 1200;

@@ -7,7 +7,7 @@ import { beginTeamTraining } from '../src/game/team-training.js';
 import { nextOfficialFixture, createOfficialPractice } from '../src/game/official-match.js';
 
 // 화면 제어를 Node에서 검증하는 최소 DOM/Canvas 경계. 브라우저 배치 검증은 하지 않는다.
-function fixture(t, mode = 'match', teamTraining = false, official = false, officialResponse = undefined) {
+function fixture(t, mode = 'match', teamTraining = false, official = false, officialResponse = undefined, extraOptions = {}) {
   class Element {
     style = {};
     classList = {
@@ -73,7 +73,7 @@ function fixture(t, mode = 'match', teamTraining = false, official = false, offi
   const dispose = mountPractice(screen, world, { onTrainingReward: message => rewardMessages.push(message),
     official: official ? { ...createOfficialPractice(world, nextOfficialFixture(world)), ...(['playoff','bo5'].includes(official) ? { playoff:true, seriesScore:{home:1,away:0}, mapNumber:2, pausesRemaining:1 } : {}), ...(official==='bo5'?{seriesLength:5}: {}) } : null,
     onOfficialComplete: async score => { officialResults.push(score); return officialResponse; },
-    onCounselingRequired: () => { counselRequests.push(true); } });
+    onCounselingRequired: () => { counselRequests.push(true); }, ...extraOptions });
   t.after(() => { try { dispose(); } finally { for (const restore of restoreGlobals) restore(); } });
   const get = key => screen.querySelector(key);
   return { get, screen, world, original, frames, rewardMessages, officialResults, counselRequests,
@@ -95,6 +95,83 @@ function fixture(t, mode = 'match', teamTraining = false, official = false, offi
     },
   };
 }
+
+test('보관함은 초안 전체·배분을 저장하고 새 경기에서 직접 불러와 기간·경로를 복원한다', async t => {
+  let saved;
+  const f = fixture(t, 'match', false, false, undefined, { onStrategySave: async library => { saved = structuredClone(library); } });
+  f.get('[data-strategy="manual"]').emit('click');
+  f.get('#manual-edit-mode').value = 'route';
+  f.get('canvas').emit('click', { clientX: 380, clientY: 260 });
+  f.get('#manual-duration').value = '6';
+  f.get('#allocation-attack').value = '3'; f.get('#allocation-attack').emit('change');
+  f.get('#strategy-name').value = 'A 진입 <전략>';
+  f.get('[data-library="save"]').emit('click');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(saved.relay.attack[0].players['home-1'].cells.length, 1);
+  assert.equal(saved.relay.attack[0].allocationA, 3);
+  assert.deepEqual(f.world.strategyLibrary, saved);
+  assert.match(f.get('#strategy-slot').innerHTML, /&lt;전략&gt;/);
+  f.get('[data-practice="reset"]').emit('click');
+  assert.equal(f.get('#allocation-attack').value, 'default');
+  assert.match(f.get('.manual-status').textContent, /초안 0\/12점/);
+  f.get('[data-library="load"]').emit('click');
+  assert.equal(f.get('#allocation-attack').value, '3');
+  assert.match(f.get('.manual-status').textContent, /초안 1\/12점/);
+  assert.match(f.get('.manual-status').textContent, /공격 6\/6라운드/);
+  assert.match(f.get('.strategy-library-message').textContent, /불러오기 완료/);
+  f.get('[data-practice="toggle"]').emit('click');
+  assert.equal(f.get('[data-library="load"]').disabled, true);
+  assert.equal(f.get('#allocation-attack').disabled, true);
+});
+
+test('수동 폭탄 담당 초안은 선수 전환 후 유지되고 전체 저장·보관함·불러오기에 반영된다', async t => {
+  const f = fixture(t);
+  assert.equal(f.get('#manual-carrier').value, '3');
+  f.get('#manual-carrier').value = '5'; f.get('#manual-carrier').emit('change');
+  f.get('#practice-player').value = 'home-2'; f.get('#practice-player').emit('change');
+  assert.equal(f.get('#manual-carrier').value, '5');
+  f.get('[data-manual="save"]').emit('click');
+  assert.match(f.get('.manual-message').textContent, /폭탄 담당 5번/);
+  const club = f.world.clubs.find(club => club.id === f.world.playerClubId);
+  const nickname = f.world.players.find(player => player.id === club.lineupIds[4]).nickname;
+  assert.ok(f.get('.round-status').textContent.includes(nickname));
+  f.get('#attack-plan').value = 'split'; f.get('#attack-plan').emit('change');
+  assert.ok(f.get('.round-status').textContent.includes(nickname));
+  f.get('[data-library="save"]').emit('click');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(f.world.strategyLibrary.relay.attack[0].carrierNumber, 5);
+  f.get('[data-practice="reset"]').emit('click');
+  assert.equal(f.get('#manual-carrier').value, '3');
+  f.get('[data-library="load"]').emit('click');
+  assert.equal(f.get('#manual-carrier').value, '5');
+  assert.ok(f.get('.round-status').textContent.includes(nickname));
+  f.get('[data-practice="toggle"]').emit('click');
+  assert.equal(f.get('#manual-carrier').disabled, true);
+});
+
+test('전략 보관 실패는 성공 메시지·보관함 변경을 남기지 않고 재시도할 수 있다', async t => {
+  const f = fixture(t, 'match', false, false, undefined, { onStrategySave: async () => { throw new Error('저장 충돌'); } });
+  f.get('#strategy-name').value = '실패 검사';
+  f.get('[data-library="save"]').emit('click');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.deepEqual(f.world.strategyLibrary, {});
+  assert.match(f.get('.strategy-library-message').textContent, /보관 실패: 저장 충돌/);
+  assert.equal(f.get('[data-library="save"]').disabled, false);
+  assert.equal(f.get('[data-library="load"]').disabled, true);
+});
+
+test('목표 사이트 0명 배분과 보관 중 중복 저장은 막고 빈 저장칸은 불러올 수 없다', async t => {
+  let resolveSave, calls = 0;
+  const f = fixture(t, 'match', false, false, undefined, { onStrategySave: () => { calls++; return new Promise(resolve => { resolveSave = resolve; }); } });
+  assert.equal(f.get('[data-library="load"]').disabled, true);
+  f.get('#allocation-attack').value = '0'; f.get('#allocation-attack').emit('change');
+  assert.equal(f.get('#allocation-attack').value, 'default');
+  assert.match(f.get('.allocation-message').textContent, /최소 1명/);
+  f.get('[data-library="save"]').emit('click'); f.get('[data-library="save"]').emit('click');
+  assert.equal(calls, 1); assert.equal(f.get('[data-library="save"]').disabled, true);
+  resolveSave(); await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(f.get('[data-library="save"]').disabled, false);
+});
 
 for (const response of [{ counselCount: 2 }, { counselCount: 0 }, { counselCount: 2, nextMap: true }]) {
   test(`공식 경기 저장 후 상담 ${response.counselCount}건·다음 맵 ${Boolean(response.nextMap)}의 자동 상담 연결`, async t => {
@@ -216,12 +293,30 @@ test('장비 구매는 선택한 총기·방탄복·권총 환불을 처리하�
   assert.deepEqual(f.world, f.original);
 });
 
+test('장비 설명과 선수 정보는 무기 속도·사거리·실제 능력 반응을 구분해 표시한다', t => {
+  const { get } = fixture(t);
+  assert.match(get('.economy-panel').querySelector('.equipment-shop').innerHTML, /이동 115% · 사거리 150/);
+  assert.match(get('.practice-readout').textContent, /무기 사거리 160 · 이동 속도 88 \(110%\)/);
+  assert.match(get('.practice-readout').textContent, /에임 \d+ · 지능 \d+ · 시각 반응/);
+  const context = get('canvas').getContext('2d'); let circle, range;
+  context.arc = (x, y, radius) => { circle = [x, y, radius]; };
+  context.stroke = () => { if (context.strokeStyle === '#d4b47c') range = circle; };
+  get('#practice-player').value = 'home-1'; get('#practice-player').emit('change');
+  assert.deepEqual(range, [100, 180, 160]);
+});
+
 test('구매할 선수 선택은 경기 상태를 바꾸지 않고 확대·라운드 전환 후에도 유지된다', t => {
   const f = fixture(t);
+  const context = f.get('canvas').getContext('2d');
+  let circle, highlight;
+  context.arc = (x, y, radius) => { circle = [x, y, radius]; };
+  context.stroke = () => { if (context.strokeStyle === '#edf1ff') highlight = circle; };
   const economy = f.get('.economy-panel');
   const selector = economy.querySelector('[data-equipment-actor="home-2"]');
   selector.dataset = { equipmentActor: 'home-2' };
   economy.emit('click', { target: { closest: () => selector } });
+  assert.equal(f.get('#practice-player').value, 'home-2');
+  assert.deepEqual(highlight, [100, 260, 15]);
   assert.match(economy.querySelector('.equipment-players').innerHTML, /data-equipment-actor="home-2" aria-pressed="true"/);
   const shop = economy.querySelector('.equipment-shop').innerHTML;
   assert.match(shop, /data-buy="home-2"/);
@@ -727,7 +822,7 @@ test('수동 편집 화면은 지도 입력·진영별 기간·선수 제한·�
   assert.match(status.textContent, /공격 5\/6라운드 \/ 수비 4\/4라운드/);
   const player = f.get('#practice-player');
   player.value = 'away-1'; player.emit('change');
-  assert.equal(f.get('[data-manual="save"]').disabled, true);
+  assert.equal(f.get('[data-manual="save"]').disabled, false);
   player.value = 'home-1'; player.emit('change');
   f.get('[data-manual="clear"]').emit('click');
   assert.match(status.textContent, /초안 0\/12점/);
@@ -820,6 +915,67 @@ test('공수 교대 시 자동 전술·사이트 조작과 수동 초안·기간
   assert.equal(get('[data-manual="save"]').disabled, false);
 });
 
+test('연막은 경유점 없이 위치만 지정·저장하며 선수별 초안과 해제를 유지한다', t => {
+  const { get, world, original } = fixture(t);
+  get('[data-strategy="manual"]').emit('click'); get('#manual-edit-mode').value = 'smoke';
+  get('canvas').emit('click', { clientX: 140, clientY: 100 });
+  assert.match(get('.manual-status').textContent, /초안 0\/12점/);
+  assert.match(get('.manual-smoke-status').textContent, /위치 지정됨.*자동 판단/);
+  get('#practice-player').value = 'home-2'; get('#practice-player').emit('change');
+  assert.match(get('.manual-smoke-status').textContent, /위치 없음/);
+  get('#practice-player').value = 'home-1'; get('#practice-player').emit('change');
+  get('[data-manual="save"]').emit('click'); assert.match(get('.manual-message').textContent, /전략 저장 완료/);
+  get('#practice-player').emit('change'); assert.match(get('.manual-smoke-status').textContent, /위치 지정됨/);
+  get('[data-manual="smoke-clear"]').emit('click'); get('[data-manual="save"]').emit('click');
+  get('#practice-player').emit('change'); assert.match(get('.manual-smoke-status').textContent, /위치 없음/);
+  assert.deepEqual(world, original);
+});
+
+test('벽 위 연막 위치는 거부하고 경기 시작 후 목표 편집을 막는다', t => {
+  const { get } = fixture(t);
+  get('[data-strategy="manual"]').emit('click'); get('#manual-edit-mode').value = 'smoke';
+  get('canvas').emit('click', { clientX: 220, clientY: 100 });
+  assert.match(get('.manual-message').textContent, /빈 칸/);
+  assert.match(get('.manual-smoke-status').textContent, /위치 없음/);
+  get('[data-practice="toggle"]').emit('click');
+  get('canvas').emit('click', { clientX: 140, clientY: 100 });
+  assert.match(get('.manual-smoke-status').textContent, /위치 없음/);
+  assert.equal(get('[data-manual="smoke-clear"]').disabled, true);
+});
+
+test('경유점 편집 중 아군 클릭은 모드를 유지해 전환하고 선수별 초안을 보존한다', t => {
+  const { get, world, original } = fixture(t);
+  const canvas = get('canvas');
+  get('[data-strategy="manual"]').emit('click');
+  get('#manual-edit-mode').value = 'route';
+  canvas.emit('click', { clientX: 380, clientY: 260 });
+  canvas.emit('click', { clientX: 100, clientY: 260 });
+  assert.equal(get('#practice-player').value, 'home-2');
+  assert.equal(get('#manual-edit-mode').value, 'route');
+  assert.match(get('.manual-status').textContent, /초안 0\/12점/);
+  assert.match(get('.economy-panel').querySelector('.equipment-players').innerHTML, /data-equipment-actor="home-2" aria-pressed="true"/);
+  canvas.emit('click', { clientX: 380, clientY: 300 });
+  canvas.emit('click', { clientX: 100, clientY: 180 });
+  assert.equal(get('#practice-player').value, 'home-1');
+  assert.equal(get('#manual-edit-mode').value, 'route');
+  assert.match(get('.manual-status').textContent, /초안 1\/12점/);
+  canvas.emit('click', { clientX: 100, clientY: 260, shiftKey: true });
+  assert.equal(get('#practice-player').value, 'home-1');
+  assert.match(get('.manual-status').textContent, /초안 2\/12점/);
+  get('[data-manual="save"]').emit('click');
+  assert.match(get('.manual-message').textContent, /선수 2명 반영/);
+  assert.equal(get('#manual-edit-mode').value, 'route');
+  assert.deepEqual(world, original);
+});
+
+test('목록 선택도 구매 선수를 동기화하고 상대 선택으로 구매 대상을 바꾸지 않는다', t => {
+  const { get } = fixture(t), economy = get('.economy-panel');
+  get('#practice-player').value = 'home-4'; get('#practice-player').emit('change');
+  assert.match(economy.querySelector('.equipment-shop').innerHTML, /data-buy="home-4"/);
+  get('#practice-player').value = 'away-1'; get('#practice-player').emit('change');
+  assert.match(economy.querySelector('.equipment-shop').innerHTML, /data-buy="home-4"/);
+});
+
 test('여러 선수의 경로·시선·기간 초안은 전환 후 유지되고 저장 한 번으로 함께 반영된다', t => {
   const f = fixture(t);
   const get = f.get;
@@ -848,7 +1004,7 @@ test('여러 선수의 경로·시선·기간 초안은 전환 후 유지되고 
   assert.equal(get('#manual-duration').value, '6');
   const secondSight = edit(380, 300, 340, 300);
   choose('away-1');
-  assert.equal(get('[data-manual="save"]').disabled, true);
+  assert.equal(get('[data-manual="save"]').disabled, false);
   choose('home-1');
   assert.equal(get('#manual-edit-mode').value, 'angle');
   assert.deepEqual(manualPaths.at(-1), firstSight);
@@ -880,6 +1036,38 @@ test('여러 선수의 경로·시선·기간 초안은 전환 후 유지되고 
   assert.equal(manualPaths.length, 0);
   choose('home-2');
   assert.deepEqual(manualPaths.at(-1), secondSight, '선택 선수만 자동 복귀한다');
+});
+
+test('상대 선수를 보고 있어도 임시저장한 5명의 경로·시선·연막을 한 번에 저장한다', t => {
+  const { get, world, original } = fixture(t), canvas = get('canvas');
+  const choose = id => { get('#practice-player').value = id; get('#practice-player').emit('change'); };
+  const expected = new Map();
+  const context = canvas.getContext('2d');
+  let path = [], direction;
+  context.beginPath = () => { path = []; };
+  context.moveTo = (x, y) => { path.push([x, y]); };
+  context.lineTo = (x, y) => { path.push([x, y]); };
+  context.stroke = () => { if (context.strokeStyle === '#f3cf83') direction = structuredClone(path); };
+  get('[data-strategy="manual"]').emit('click');
+  for (let number = 1; number <= 5; number++) {
+    choose(`home-${number}`);
+    get('#manual-edit-mode').value = 'route'; canvas.emit('click', { clientX: 380, clientY: 260 });
+    get('#manual-edit-mode').value = 'angle'; canvas.emit('click', { clientX: 420, clientY: 260 + number * 4 });
+    get('#manual-edit-mode').value = 'smoke'; canvas.emit('click', { clientX: 140, clientY: 100 });
+    expected.set(`home-${number}`, structuredClone(direction));
+  }
+  assert.match(get('.manual-status').textContent, /저장 대기 5명/);
+  choose('away-1');
+  assert.equal(get('[data-manual="save"]').disabled, false);
+  get('[data-manual="save"]').emit('click');
+  assert.match(get('.manual-message').textContent, /선수 5명 반영 \(임시저장 전체\)/);
+  for (let number = 1; number <= 5; number++) {
+    choose(`home-${number}`);
+    assert.match(get('.manual-status').textContent, /초안 1\/12점 · 저장 대기 0명/);
+    assert.match(get('.manual-smoke-status').textContent, /위치 지정됨/);
+    assert.deepEqual(direction, expected.get(`home-${number}`));
+  }
+  assert.deepEqual(world, original);
 });
 
 test('미저장 초안은 라운드·사이트 전환 후 유지되며 초기화·맵 변경 시 제거된다', t => {

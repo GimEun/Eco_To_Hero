@@ -4,7 +4,9 @@ import { getClubView } from '../game/world-selectors.js';
 import { createPractice, advancePractice, visibleOpponents, STEP_MS } from '../simulation/practice.js';
 import { drawPractice } from '../rendering/practice-map.js';
 import { escapeHtml } from './screens.js';
-import { weaponFor } from '../data/weapons.js';
+import { weaponFor, movementSpeed } from '../data/weapons.js';
+import { reactionTicks } from '../simulation/combat.js';
+import { HEARING_RANGE } from '../simulation/sound.js';
 import { THROWABLES } from '../data/throwables.js';
 import { sightRange } from '../simulation/geometry.js';
 import { ROUND_RULES, ROUND_REASONS } from '../config/round.js';
@@ -17,13 +19,14 @@ import { prepareRound, setupRound } from '../simulation/round.js';
 import { matchPlayerStats, matchPlayerMetrics } from '../simulation/match.js';
 import { highlightsPanel, renderHighlights } from './match-highlights.js';
 import { ATTACK_TACTICS } from '../data/attack-tactics.js';
-import { setAttackPlan } from '../simulation/attack-tactics.js';
-import { MANUAL_DURATIONS, canEditManual, validateManualRoute, setManualRoute, clearManualRoute, setManualDuration, manualRouteStart } from '../simulation/manual-tactics.js';
+import { setAttackPlan, assignAttackTasks } from '../simulation/attack-tactics.js';
+import { MANUAL_DURATIONS, canEditManual, validateManualRoute, validateManualSmoke, setManualRoute, setManualSmoke, clearManualRoute, setManualDuration, manualRouteStart, setManualCarrier } from '../simulation/manual-tactics.js';
 import { canEditTactics, canRequestTimeout, requestTimeout, requestPause, resumeTimeout, TIMEOUT_RULES } from '../simulation/timeout.js';
 import { cellCenter } from '../simulation/geometry.js';
 import { settleTeamTraining } from '../game/team-training.js';
 import { TEAM_TRAINING_MODES } from '../config/team-training.js';
 import { nextPracticeOpponent } from './practice-opponents.js';
+import { strategyLibraryPanel, siteAllocationPanel, mountStrategyLibrary } from './strategy-library-panel.js';
 
 export function practiceScreen() {
   const screen = document.createElement('section');
@@ -37,20 +40,24 @@ export function practiceScreen() {
     ${matchPanel()}
     <p class="practice-teams"></p>
     <div class="practice-controls practice-panel-toolbar"><button type="button" class="button secondary" data-strategy="manual" aria-expanded="false" aria-controls="manual-strategy-panel">수동 전략</button><button type="button" class="button secondary" data-strategy="automatic" aria-expanded="false" aria-controls="automatic-strategy-panel">자동 전략</button><button type="button" class="button secondary" data-strategy="purchase" aria-expanded="false" aria-controls="purchase-panel">장비 구매</button><button type="button" class="button secondary" data-strategy="content" aria-expanded="false" aria-controls="match-content-panel">경기 내용</button><span class="timeout-status input-hint" role="status"></span><button type="button" class="button primary" data-action="next-playoff-map" hidden>BO3 다음 맵 →</button></div>
-    <div class="practice-workspace"><div class="practice-layout"><div class="panel practice-map-wrap"><div class="practice-map-heading"><span>플레이 화면</span><p class="round-status" role="status" aria-live="off"></p><button type="button" class="button secondary" data-practice="expand-map" aria-pressed="false">화면 크게 ↗</button></div><div class="practice-map-stage"><canvas class="practice-canvas" width="960" height="640" aria-label="중계소 2D 지도. 선수 선택 목록에서 시야를 확인할 선수를 선택할 수 있습니다.">브라우저에서 Canvas를 지원해야 지도를 표시할 수 있습니다.</canvas></div><div class="map-legend" aria-label="지도 범례"><strong>지도 범례</strong><span><i class="home-dot"></i>내 팀</span><span><i class="away-dot"></i>상대 팀</span><span>금색 외곽: 감지한 상대</span><span>선: 발사 궤적 · X: 사망 위치</span></div></div>
+    <div class="practice-workspace"><div class="practice-layout"><div class="panel practice-map-wrap"><div class="practice-map-heading"><span>플레이 화면</span><p class="round-status" role="status" aria-live="off"></p><button type="button" class="button secondary" data-practice="expand-map" aria-pressed="false">화면 크게 ↗</button></div><div class="practice-map-stage"><canvas class="practice-canvas" width="960" height="640" aria-label="중계소 2D 지도. 선수 선택 목록에서 시야를 확인할 선수를 선택할 수 있습니다.">브라우저에서 Canvas를 지원해야 지도를 표시할 수 있습니다.</canvas></div><div class="map-legend" aria-label="지도 범례"><strong>지도 범례</strong><span><i class="home-dot"></i>내 팀</span><span><i class="away-dot"></i>상대 팀</span><span>금색 외곽: 감지한 상대</span><span>금색 점선 원: 무기 최대 사거리 · 시야/벽 판정 별도</span><span>선: 발사 궤적 · X: 사망 위치</span></div></div>
     <details class="panel practice-details"><summary>선수 정보·시야</summary><label for="practice-player">시야를 확인할 선수</label><select id="practice-player"></select><div class="practice-readout" aria-live="off"></div><div class="practice-detection" role="status" aria-live="polite"></div><p class="input-hint" data-description="선수 선택과 지도 표시">지도나 목록으로 선수를 선택하세요. 점선은 이동 경로, 작은 사각형은 목적지, 큰 점선 사각형은 수비 담당 구역입니다. 금색 ◆는 폭탄입니다.</p></details></div>
     <div class="strategy-options">
 
     <div class="practice-panels"><section id="manual-strategy-panel" class="manual-editor panel" aria-label="수동 전략 설정" hidden>
-      <p class="input-hint" data-description="수동 경로 설정">내 팀 선수를 선택하세요. 현재 내 팀 진영의 경로만 편집할 수 있습니다. 경유점과 마지막 지점의 시선을 지정한 뒤 다른 선수도 편집하세요. 선수별 초안은 유지되며 저장을 누르면 기간과 편집한 모든 선수의 경로·시선이 함께 반영됩니다.</p>
+      <p class="input-hint" data-description="수동 경로 설정">편집 중에도 다른 아군을 클릭하면 선택을 바꾸고 같은 모드로 계속 편집합니다. 빈 곳을 눌러 경유점을 추가하세요. 선수가 있는 위치에 지정하려면 Shift를 누른 채 클릭하세요. 선수별 초안은 유지되며 저장하면 현재 진영의 기간과 편집한 모든 선수 설정을 함께 반영합니다.</p>
       <div class="practice-controls"><label for="manual-duration">적용 기간</label><select id="manual-duration"><option value="4">4라운드</option><option value="6">6라운드</option><option value="12">12라운드</option></select></div>
-      <div class="practice-controls"><label for="manual-edit-mode">지도 조작</label><select id="manual-edit-mode"><option value="select">선수 선택</option><option value="route">경유점 추가</option><option value="angle">시선 지정</option></select><button type="button" class="button secondary" data-manual="undo">마지막 점 취소</button><button type="button" class="button primary" data-manual="save">저장</button><button type="button" class="button secondary" data-manual="clear">자동 전술</button></div>
+      <div class="practice-controls"><label for="manual-edit-mode">지도 조작</label><select id="manual-edit-mode"><option value="select">선수 선택</option><option value="route">경유점 추가</option><option value="angle">시선 지정</option><option value="smoke">연막 목표 지정</option></select><button type="button" class="button secondary" data-manual="undo">마지막 점 취소</button><button type="button" class="button primary" data-manual="save">전체 전략 저장</button><button type="button" class="button secondary" data-manual="clear">자동 전술</button></div>
+      <div class="practice-controls"><button type="button" class="button secondary" data-manual="smoke-clear">연막 위치 해제</button><span class="manual-smoke-status input-hint" role="status"></span></div><p class="input-hint">‘연막 목표 지정’으로 위치만 찍으세요. 이동 중 벽에 막히지 않고 던질 수 있는 거리에서 자동 투척합니다. 경로 지정은 선택이며 연막은 직접 구매해야 합니다.</p>
+      <div class="practice-controls manual-carrier-row"><label for="manual-carrier">폭탄 담당</label><select id="manual-carrier"></select><span class="input-hint">전체 전략 저장 후 적용 · A/B 사이트 도착 시 교전 우선, 교전이 없으면 즉시 설치 · 담당 변경은 시작 전만 가능</span></div>
       <p class="manual-status input-hint"></p><p class="manual-message" role="status"></p>
+      ${strategyLibraryPanel()}
       <p class="input-hint" data-description="수동 전략 적용 기간">기간은 진영별로 모든 선수 설정이 공유합니다. 해당 진영에서 수동 설정이 있는 라운드가 끝날 때만 1회 차감하며, 만료되면 자동 전술을 사용합니다. 저장하면 현재 진영의 기간도 갱신합니다. 자동 전술 버튼도 저장 후 반영됩니다. 초안은 현재 경기에서 유지하며 새 경기 초기화·맵 변경 시 지웁니다. 교전·폭탄 행동이 우선하며 설치 후에는 자동 배치를 사용합니다.</p>
     </section>
       <section id="automatic-strategy-panel" class="automatic-editor panel" aria-label="자동 전략 설정" hidden><div class="practice-controls" data-tactic-row="defense-plan"><label for="defense-plan">수비 전술</label><select id="defense-plan"><option value="standard">기본 수비</option><option value="forward">전진 수비</option></select></div><div class="practice-controls" data-tactic-row="attack-plan"><label for="attack-plan">공격 전술</label><select id="attack-plan"><option value="execute">집중 진입</option><option value="split">분산 진입</option></select></div><div class="practice-controls" data-tactic-row="round-site"><label for="round-site">목표 사이트</label><select id="round-site"><option>A</option><option>B</option></select></div>
     <p class="tactics-description info-note" data-description="자동 수비 전술"></p>
     <p class="attack-description info-note" data-description="자동 공격 전술"></p>
+    ${siteAllocationPanel()}
       </section>
       <div id="purchase-panel" class="purchase-panel" hidden>${economyPanel()}</div>
       <div id="match-content-panel" class="combat-records" hidden><section class="panel combat-stat-panel"><div class="roster-heading"><h2>연습 기록</h2><span class="combat-survivors tag muted-tag"></span></div><details class="combat-help" data-description="경기 통계 기준"><summary>통계 기준</summary><p class="input-hint combat-metrics-note">명중률 = 명중 / 발사. ADR = MR12 완료 라운드의 총 피해 / 완료 라운드 수이며 라운드 종료 때 갱신합니다. 발사·완료 라운드가 없거나 ADR 대상이 아닌 모드는 —로 표시합니다.</p></details><div class="table-scroll" role="region" aria-label="경기 선수 통계" tabindex="0"><table class="combat-table"><thead><tr><th scope="col">선수</th><th scope="col">HP</th><th scope="col">탄약</th><th scope="col">K/D/A</th><th scope="col">피해</th><th scope="col">발사</th><th scope="col">명중</th><th scope="col">명중률</th><th scope="col">ADR</th></tr></thead><tbody></tbody></table></div></section><section class="panel combat-feed"><div class="roster-heading"><h2>최근 교전 이벤트</h2></div><ol class="combat-events" aria-label="최근 교전 이벤트"></ol></section>${highlightsPanel()}</div>
@@ -60,7 +67,7 @@ export function practiceScreen() {
   return screen;
 }
 
-export function mountPractice(screen, world, { onTrainingReward = () => {}, official = null, onOfficialComplete = async () => {}, onCounselingRequired = null } = {}) {
+export function mountPractice(screen, world, { onTrainingReward = () => {}, official = null, onOfficialComplete = async () => {}, onCounselingRequired = null, onStrategySave = async () => {} } = {}) {
   const bo3 = Boolean(official?.series || official?.playoff);
   const seriesLabel=official?.seriesLength===5?'BO5':'BO3';
   for(const button of screen.querySelectorAll('[data-action="next-playoff-map"]'))button.textContent=`${seriesLabel} 다음 맵 →`;
@@ -109,7 +116,9 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
   let manualSide;
   const currentSide = () => state.round?.attackTeam === 'home' ? 'attack' : 'defense';
   const manualDuration = screen.querySelector('#manual-duration');
+  const manualCarrier = screen.querySelector('#manual-carrier');
   const manualMode = screen.querySelector('#manual-edit-mode');
+  const smokeClear = screen.querySelector('[data-manual="smoke-clear"]');
   const manualButtons = Object.fromEntries(['undo', 'save', 'clear'].map(key => [key, screen.querySelector(`[data-manual="${key}"]`)]));
   const manualMessage = screen.querySelector('.manual-message');
   if (!context) {
@@ -123,6 +132,7 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     readout.textContent = '이 브라우저에서 2D 지도를 표시할 수 없습니다.';
     toggle.disabled = true; reset.disabled = true; next.disabled = true; select.disabled = true; modeSelect.disabled = true; sideSelect.disabled = true; siteSelect.disabled = true; defenseSelect.disabled = true; attackSelect.disabled = true;
     manualDuration.disabled = manualMode.disabled = true;
+    smokeClear.disabled = true;
     for (const button of Object.values(manualButtons)) button.disabled = true;
     return () => {};
   }
@@ -161,6 +171,7 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
   let lastMatchKey = null;
   let manualCells = [];
   let manualAngle = 0;
+  let manualSmoke = null;
   let manualDrafts = {};
   let manualOpen = false;
   let automaticOpen = false;
@@ -220,13 +231,19 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     const stored = draft?.players[selectedId] ?? plan?.players[selectedId];
     manualCells = stored ? stored.cells.map(cell => ({ ...cell })) : [];
     manualAngle = stored?.angle ?? (manualSide === 'defense' ? Math.PI : 0);
+    const smoke = draft?.players[selectedId] ? stored.smoke : plan?.smokes?.[selectedId];
+    manualSmoke = smoke ? structuredClone(smoke) : null;
     manualDuration.value = String(draft?.duration ?? plan?.duration ?? 4);
+    manualCarrier.innerHTML = state.actors.filter(actor => actor.team === 'home')
+      .sort((a, b) => a.number - b.number).map(actor => `<option value="${actor.number}">${actor.number} · ${escapeHtml(actor.nickname)}</option>`).join('');
+    manualCarrier.value = String(manualDrafts.attack?.carrierNumber ?? state.manualPlans?.attack?.carrierNumber ?? 3);
     manualMode.value = stored?.mode ?? 'select';
     manualMessage.textContent = '';
   }
   function keepManualDraft(changed = false) {
     const draft = manualDrafts[manualSide] ??= { players: {} };
     draft.players[selectedId] = { cells: manualCells.map(cell => ({ ...cell })), angle: manualAngle,
+      smoke: manualSmoke ? structuredClone(manualSmoke) : null,
       mode: manualMode.value, changed: changed || Boolean(draft.players[selectedId]?.changed) };
   }
   loadManualDraft();
@@ -234,6 +251,7 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
   screen.querySelector('.practice-teams').textContent = `${home.name} (파랑)  vs  ${away.name} (보라) · 테스트 경로 이동`;
 
   function draw() {
+    library.render();
     if (disposed) return;
     if (manualSide !== currentSide()) loadManualDraft();
     screen.querySelector('.page-heading h1').textContent = `${map.name} · ${official ? `${['시 리그','도 리그','전국 리그','세계 리그'].includes(official.leagueLabel) ? '' : 'PC방 '}${officialLabel}` : '팀 연습'}`;
@@ -250,7 +268,7 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     const height = Math.round(displayHeight * ratio);
     if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
     context.setTransform(width / (map.columns * map.tileSize), 0, 0, height / (map.rows * map.tileSize), 0, 0);
-    drawPractice(context, map, state, selectedId, manualOpen && state.round ? { side: manualSide, cells: manualCells, angle: manualAngle } : undefined);
+    drawPractice(context, map, state, selectedId, manualOpen && state.round ? { side: manualSide, cells: manualCells, angle: manualAngle, smoke: manualSmoke } : undefined);
     const selected = state.actors.find(actor => actor.id === selectedId);
     strategyToolbar.hidden = !state.round && !state.combat;
     strategyOptions.hidden = !(state.round && (manualOpen || automaticOpen) || state.economy && purchaseOpen || state.combat && contentOpen);
@@ -266,9 +284,16 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     automaticToggle.ariaExpanded = String(Boolean(state.round && automaticOpen));
     const manualEditable = canEditManual(state) && selected.team === 'home';
     manualDuration.disabled = manualMode.disabled = !manualEditable;
+    screen.querySelector('.manual-carrier-row').hidden = !state.round || manualSide !== 'attack';
+    manualCarrier.disabled = !canEditManual(state) || !state.round || state.round.started || manualSide !== 'attack';
+    smokeClear.disabled = !manualEditable || !manualSmoke;
+    screen.querySelector('.manual-smoke-status').textContent = manualSmoke
+      ? '연막 위치 지정됨 · 투척 시점 자동 판단'
+      : '연막 위치 없음 · 기존 자동 투척 사용';
     for (const button of Object.values(manualButtons)) button.disabled = !manualEditable;
+    manualButtons.save.disabled = !canEditManual(state);
     if (state.manualPlans) {
-      const counts = side => { const plan = state.manualPlans[side]; return `${side === 'attack' ? '공격' : '수비'} ${plan.remaining}/${plan.duration}라운드${Object.keys(plan.players).length ? '' : ' (설정 없음)'}`; };
+      const counts = side => { const plan = state.manualPlans[side]; return `${side === 'attack' ? '공격' : '수비'} ${plan.remaining}/${plan.duration}라운드${Object.keys(plan.players).length || Object.keys(plan.smokes ?? {}).length ? '' : ' (설정 없음)'}`; };
       const pending = Object.values(manualDrafts[manualSide]?.players ?? {}).filter(player => player.changed).length;
       screen.querySelector('.manual-status').textContent = `${selected.nickname} · ${manualSide === 'attack' ? '공격' : '수비'} 초안 ${manualCells.length}/12점 · 저장 대기 ${pending}명 · ${counts('attack')} / ${counts('defense')}${manualEditable ? '' : ' · 구매 단계·감독 타임아웃의 내 팀 선수만 편집 가능'}`;
     }
@@ -305,7 +330,7 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     next.disabled = !state.economy?.settled || !state.complete || Boolean(state.match?.complete);
     const matchKey = state.match ? `${state.economy.roundNumber}:${state.match.history.length}:${state.match.complete}` : 'none';
     if (matchKey !== lastMatchKey) { renderMatch(match, state); renderHighlights(screen.querySelector('.match-highlights'), state); lastMatchKey = matchKey; }
-    const economyKey = state.economy ? `${state.economy.roundNumber}:${state.economy.phase}:${state.economy.ledger.length}:${state.actors.filter(actor => actor.team === 'home').map(actor => `${actor.weaponId}:${actor.armor}:${actor.alive}:${Object.values(actor.throwables).join('')}`).join(',')}` : 'none';
+    const economyKey = state.economy ? `${equipmentActorId}:${state.economy.roundNumber}:${state.economy.phase}:${state.economy.ledger.length}:${state.actors.filter(actor => actor.team === 'home').map(actor => `${actor.weaponId}:${actor.armor}:${actor.alive}:${Object.values(actor.throwables).join('')}`).join(',')}` : 'none';
     if (economyKey !== lastEconomyKey) { renderEconomy(economy, state, equipmentActorId); lastEconomyKey = economyKey; }
     screen.querySelector('.round-options').hidden = !state.round;
     const tacticDescription = screen.querySelector('.tactics-description');
@@ -338,6 +363,15 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     const weapon = weaponFor(selected);
     const selectedStats = matchPlayerStats(state, selected);
     readout.textContent = `${selected.name} · ${selected.nickname}\n위치 ${selected.x.toFixed(1)}, ${selected.y.toFixed(1)}\n시야 ${Math.round(selected.fieldOfView * 180 / Math.PI)}° · 거리 ${Math.round(sightRange(selected, state))}\n${activity}${selected.defenseTask && state.round?.bomb.status !== 'planted' ? `\n임무 ${selected.defenseTask.label} · 담당 ${selected.defenseTask.site}\n${DEFENSE_TACTICS[selected.defenseTask.plan].name}${selected.defenseTask.withdrawn ? ' · 후퇴 유지' : ''}` : ''}${state.combat ? `\nHP ${selected.hp}/100 · 방탄복 ${selected.armor ?? 0}/100 · ${weapon.name}\n탄약 ${selected.ammo}/${weapon.magazineSize}${selected.reloadUntilTick !== null ? ' · 재장전 중' : ''}\n${state.match ? '경기 누적 ' : ''}K/D/A ${selectedStats.kills}/${selectedStats.deaths}/${selectedStats.assists}\n누적 피해 ${selectedStats.damage}${state.economy ? `\n경기 자금 $${selected.cash.toLocaleString('en-US')}` : ''}` : ''}`;
+    if (state.combat) {
+      readout.textContent += `\n무기 사거리 ${weapon.range} · 이동 속도 ${movementSpeed(selected).toFixed(0)} (${Math.round((weapon.moveMultiplier ?? 1) * 100)}%)`;
+      readout.textContent += `\n에임 ${selected.aim} · 지능 ${selected.intelligence} · 시각 반응 ${(reactionTicks(selected) * STEP_MS / 1000).toFixed(2)}초`;
+      readout.textContent += `\n소리 감지 ${HEARING_RANGE} · 소리 반응 ${(reactionTicks(selected) * 2 * STEP_MS / 1000).toFixed(2)}초`;
+      if (selected.pendingSound) readout.textContent += `\n소리 반응 대기 ${Math.max(0, (selected.pendingSound.readyTick - state.tick) * STEP_MS / 1000).toFixed(2)}초`;
+      if (selected.heardSound) readout.textContent += `\n최근 ${selected.heardSound.kind === 'shot' ? '총성' : '발소리'} 위치 ${selected.heardSound.x.toFixed(0)}, ${selected.heardSound.y.toFixed(0)}`;
+      if (selected.targetId && selected.readyTick > state.tick) readout.textContent += `\n지능 ${selected.intelligence} · 사격 반응 대기 ${((selected.readyTick - state.tick) * STEP_MS / 1000).toFixed(2)}초`;
+      if (selected.fatiguePenalty < 0) readout.textContent += `\n컨디션 저하 · 에임/지능 ${selected.fatiguePenalty} 적용`;
+    }
     if (selected.alive && !state.complete && state.round?.saveReason && selected.team !== state.round.attackTeam) {
       readout.textContent += `\n판단: ${state.round.saveReason === 'time' ? '장비 보존 · 해체 시간 부족' : '장비 보존 · 불리한 재탈환'}`;
     }
@@ -380,7 +414,7 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
         if (event.type === 'flashed') return `<li><time>${time}s</time>${escapeHtml(actor.nickname)} · 섬광 효과 ${(event.durationTicks * STEP_MS / 1000).toFixed(2)}초</li>`;
         const target = state.actors.find(item => item.id === event.targetId);
         if (event.type === 'grenade-hit') return `<li><time>${time}s</time>${escapeHtml(actor.nickname)} → ${escapeHtml(target.nickname)} · 수류탄 ${event.damage} 피해${event.friendlyFire ? ' (아군/자해)' : ''}</li>`;
-        return `<li><time>${time}s</time>${escapeHtml(actor.nickname)} → ${escapeHtml(target.nickname)} · ${event.hit ? `명중 ${event.damage} 피해` : '빗나감'}</li>`;
+        return `<li><time>${time}s</time>${escapeHtml(actor.nickname)} → ${escapeHtml(target.nickname)} · ${event.hit ? `명중 ${event.damage} 피해` : '빗나감'}${Number.isFinite(event.chance) ? ` · 에임 ${event.aim} · 명중 확률 ${Math.round(event.chance * 100)}%${event.fatiguePenalty < 0 ? ` · 컨디션 저하 ${event.fatiguePenalty}` : ''}` : ''}</li>`;
       }).join('') || '<li>시작 후 실제 교전 이벤트를 표시합니다.</li>';
       lastEventCount = state.events.length;
     }
@@ -457,6 +491,12 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
   };
   const onSite = () => {
     if (siteSelect.disabled || !map.sites.some(site => site.name === siteSelect.value)) return;
+    const count = state.siteAllocation?.home?.attack;
+    if (Number.isInteger(count) && (siteSelect.value === 'A' ? count === 0 : count === 5)) {
+      siteSelect.value = state.round.siteName;
+      screen.querySelector('.allocation-message').textContent = '목표 사이트에 최소 1명을 배분한 뒤 변경하세요.';
+      return;
+    }
     setupRound(state, map, state.round.attackTeam, siteSelect.value);
     clearViews(); draw();
   };
@@ -465,8 +505,8 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     const button = event.target.closest('[data-equipment-actor], [data-buy]');
     if (!button || !economy.contains(button)) return;
     if (button.dataset.equipmentActor) {
-      equipmentActorId = button.dataset.equipmentActor;
-      renderEconomy(economy, state, equipmentActorId);
+      select.value = button.dataset.equipmentActor;
+      onSelect();
       economy.querySelector('.economy-message').textContent = '';
       economy.querySelector(`[data-equipment-actor="${equipmentActorId}"]`)?.focus?.();
       return;
@@ -476,7 +516,16 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     economy.querySelector('.economy-message').textContent = result.message;
     draw();
   };
-  const onSelect = () => { selectedId = select.value; loadManualDraft(); draw(); };
+  const onSelect = () => {
+    const actor = state.actors.find(actor => actor.id === select.value);
+    if (!actor) return;
+    const mode = manualMode.value;
+    selectedId = actor.id;
+    if (actor.team === 'home') equipmentActorId = actor.id;
+    loadManualDraft();
+    if (manualOpen) manualMode.value = mode;
+    draw();
+  };
   const onDefense = () => {
     if (defenseSelect.disabled) return;
     if (setDefensePlan(state, map, defenseSelect.value)) { if (!state.timeout?.active) prepareRound(state, map); }
@@ -493,6 +542,11 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     const rect = canvas.getBoundingClientRect();
     const x = (event.clientX - rect.left) / rect.width * map.columns * map.tileSize;
     const y = (event.clientY - rect.top) / rect.height * map.rows * map.tileSize;
+    const actor = state.actors.find(item => Math.hypot(item.x - x, item.y - y) <= item.radius + 8);
+    if (!manualEditor.hidden && manualMode.value !== 'select' && !event.shiftKey
+      && actor?.team === 'home' && actor.id !== selectedId) {
+      select.value = actor.id; onSelect(); return;
+    }
     if (!manualEditor.hidden && manualMode.value !== 'select') {
       if (!canEditManual(state)) return;
       const selected = state.actors.find(actor => actor.id === selectedId);
@@ -502,7 +556,11 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
         const validation = validateManualRoute(map, selected, manualSide, cells, manualAngle, manualRouteStart(state, map, selected, manualSide));
         if (validation.ok) { manualCells = validation.cells; keepManualDraft(true); manualMessage.textContent = '경유점 임시 저장됨 · 저장을 눌러 전체 편집을 반영하세요.'; }
         else manualMessage.textContent = validation.message;
-      } else if (manualCells.length) {
+      } else if (manualMode.value === 'smoke') {
+        const result = validateManualSmoke(map, { cell: { x: Math.floor(x / map.tileSize), y: Math.floor(y / map.tileSize) } });
+        if (result.ok) { manualSmoke = result.smoke; keepManualDraft(true); manualMessage.textContent = '연막 위치 지정됨 · 저장하면 투척 시점은 자동 판단합니다.'; }
+        else manualMessage.textContent = result.message;
+      } else if (manualMode.value === 'angle' && manualCells.length) {
         const end = cellCenter(map, manualCells.at(-1));
         if (Math.hypot(x - end.x, y - end.y) > 1) {
           manualAngle = Math.atan2(y - end.y, x - end.x);
@@ -513,38 +571,60 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
       draw();
       return;
     }
-    const actor = state.actors.find(item => Math.hypot(item.x - x, item.y - y) <= item.radius + 8);
-    if (actor) { selectedId = actor.id; select.value = selectedId; loadManualDraft(); draw(); }
+    if (actor) { select.value = actor.id; onSelect(); }
   };
   const onManualUndo = () => {
-    if (!manualButtons.undo.disabled && manualCells.length) { manualCells.pop(); keepManualDraft(true); draw(); }
+    if (!manualButtons.undo.disabled && manualCells.length) {
+      manualCells.pop();
+      keepManualDraft(true); draw();
+    }
   };
   const onManualSave = () => {
     if (manualButtons.save.disabled || !canEditManual(state)) return;
+    const editMode = manualMode.value;
     const duration = Number(manualDuration.value);
     if (!MANUAL_DURATIONS.includes(duration)) return;
+    const carrierNumber = Number(manualCarrier.value);
+    const carrierChanged = manualSide === 'attack' && carrierNumber !== (state.manualPlans.attack.carrierNumber ?? 3);
+    if (manualSide === 'attack' && (!Number.isInteger(carrierNumber) || carrierNumber < 1 || carrierNumber > 5
+      || carrierChanged && (state.round.started || !state.actors.find(actor => actor.id === `home-${carrierNumber}`)?.alive))) {
+      manualMessage.textContent = '폭탄 담당은 구매 단계 또는 라운드 시작 전에 내 팀 주전으로 지정하세요.';
+      return;
+    }
     const players = Object.entries(manualDrafts[manualSide]?.players ?? {}).filter(([, player]) => player.changed);
     // 전체 검증이 끝나기 전에는 기간·경로를 변경하지 않는다.
     for (const [id, player] of players) {
-      if (!player.cells.length) continue;
       const actor = state.actors.find(item => item.id === id);
-      const result = validateManualRoute(map, actor, manualSide, player.cells, player.angle, manualRouteStart(state, map, actor, manualSide));
-      if (!result.ok) { manualMessage.textContent = `${actor.nickname}: ${result.message}`; return; }
+      if (player.cells.length) {
+        const result = validateManualRoute(map, actor, manualSide, player.cells, player.angle, manualRouteStart(state, map, actor, manualSide));
+        if (!result.ok) { manualMessage.textContent = `${actor.nickname}: ${result.message}`; return; }
+      }
+      const utility = validateManualSmoke(map, player.smoke);
+      if (!utility.ok) { manualMessage.textContent = `${actor.nickname}: ${utility.message}`; return; }
+    }
+    if (carrierChanged) {
+      const result = setManualCarrier(state, `home-${carrierNumber}`);
+      if (!result.ok) { manualMessage.textContent = result.message; return; }
+      assignAttackTasks(state, map, 'home');
     }
     setManualDuration(state, manualSide, duration);
     for (const [id, player] of players) {
       if (player.cells.length) setManualRoute(state, map, id, manualSide, player.cells, player.angle);
       else clearManualRoute(state, id, manualSide);
+      setManualSmoke(state, map, id, manualSide, player.smoke);
     }
     delete manualDrafts[manualSide];
     if (!state.timeout?.active) prepareRound(state, map);
     loadManualDraft();
-    manualMessage.textContent = `${manualSide === 'attack' ? '공격' : '수비'} 전략 저장 완료 · 기간 ${duration}라운드 · 선수 ${players.length}명 반영`;
+    manualMode.value = editMode;
+    manualMessage.textContent = `${manualSide === 'attack' ? '공격' : '수비'} 전략 저장 완료 · 기간 ${duration}라운드 · 선수 ${players.length}명 반영 (임시저장 전체)${manualSide === 'attack' ? ` · 폭탄 담당 ${carrierNumber}번` : ''}`;
     draw();
+    return true;
   };
   const onManualClear = () => {
     if (manualButtons.clear.disabled) return;
     manualCells = [];
+    manualSmoke = null;
     keepManualDraft(true);
     manualMessage.textContent = '자동 전술로 복귀할 초안입니다. 저장을 눌러 반영하세요.';
     draw();
@@ -556,7 +636,18 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     manualMessage.textContent = '기간 임시 저장됨 · 저장을 눌러 전체 편집을 반영하세요.';
     draw();
   };
+  const onSmokeClear = () => {
+    if (smokeClear.disabled) return;
+    manualSmoke = null; keepManualDraft(true); draw();
+    manualMessage.textContent = '연막 위치 해제 초안 · 저장 후 기존 자동 투척을 사용합니다.';
+  };
   const onManualMode = () => { if (!manualMode.disabled) keepManualDraft(); };
+  const onManualCarrier = () => {
+    if (manualCarrier.disabled) return;
+    const draft = manualDrafts.attack ??= { players: {} };
+    draft.carrierNumber = Number(manualCarrier.value);
+    manualMessage.textContent = '폭탄 담당 변경 초안 · 전체 전략 저장 후 적용됩니다.';
+  };
   const onVisibility = () => { if (document.hidden && running && requestPause(state)) pause(); };
   const onOpenRules = () => { if (!rulesDialog.open) rulesDialog.showModal(); };
   const onCloseRules = () => rulesDialog.close();
@@ -591,6 +682,17 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     }
     if (event.key === 'Escape' && mapExpanded && !resultDialog.open && !rulesDialog.open && !event.target?.closest?.('dialog')) { event.preventDefault(); onExpandMap(); }
   };
+  const library = mountStrategyLibrary(screen, world, {
+    getState: () => state, getMap: () => map, getSide: currentSide, commitDraft: onManualSave,
+    onSave: onStrategySave,
+    refresh: loaded => {
+      if (loaded) { delete manualDrafts[currentSide()]; loadManualDraft(); }
+      if (state.attackPlans) attackSelect.value = state.attackPlans.home;
+      if (state.defensePlans) defenseSelect.value = state.defensePlans.home;
+      if (state.round) { siteSelect.value = state.round.siteName; prepareRound(state, map); }
+      draw();
+    },
+  });
   openRules.addEventListener('click', onOpenRules);
   closeRules.addEventListener('click', onCloseRules);
   expandMap.addEventListener('click', onExpandMap);
@@ -622,6 +724,8 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
   manualButtons.clear.addEventListener('click', onManualClear);
   manualDuration.addEventListener('change', onManualDuration);
   manualMode.addEventListener('change', onManualMode);
+  manualCarrier.addEventListener('change', onManualCarrier);
+  smokeClear.addEventListener('click', onSmokeClear);
   document.addEventListener('visibilitychange', onVisibility);
   window.addEventListener('resize', draw);
   const observer = new ResizeObserver(draw);
@@ -632,6 +736,7 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
 
   return () => {
     disposed = true;
+    library.dispose();
     rulesDialog.close();
     for (const [element, inert] of backgroundInert) element.inert = inert;
     backgroundInert.clear();
@@ -671,6 +776,8 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     manualButtons.clear.removeEventListener('click', onManualClear);
     manualDuration.removeEventListener('change', onManualDuration);
     manualMode.removeEventListener('change', onManualMode);
+    manualCarrier.removeEventListener('change', onManualCarrier);
+    smokeClear.removeEventListener('click', onSmokeClear);
   };
 }
 

@@ -4,6 +4,7 @@ import { weaponFor } from '../data/weapons.js';
 import { canEditTactics } from './timeout.js';
 import { selectTarget } from './combat.js';
 import { manualPlanFor } from './manual-tactics.js';
+import { allocatedSite } from './site-allocation.js';
 
 export function setupDefensePlans(state, plans) {
   if (!plans || !Object.hasOwn(DEFENSE_TACTICS, plans.home) || !Object.hasOwn(DEFENSE_TACTICS, plans.away)) {
@@ -20,7 +21,14 @@ export function assignDefenseTasks(state, map, team = null) {
     actor.defenseTask = null; actor.retreating = false;
     if (!state.defensePlans || actor.team === state.round.attackTeam) continue;
     const plan = state.defensePlans[actor.team];
-    const task = map.tactics.defenseTasks[actor.number - 1];
+    const site = allocatedSite(state, actor);
+    const peers = state.actors.filter(other => other.team === actor.team && allocatedSite(state, other) === site)
+      .sort((a, b) => a.number - b.number);
+    const index = peers.findIndex(other => other.id === actor.id);
+    const templates = map.tactics.defenseTasks.filter(task => task.site === site);
+    const guard = site && map.tactics.attackSites[site].guards[index];
+    const task = !site ? map.tactics.defenseTasks[actor.number - 1] : templates[index]
+      ?? { label: `${site} 구역 지원`, role: index === 2 ? 'support' : 'anchor', site, standard: guard, fallback: guard };
     const [x, y] = plan === 'forward' && task.forward ? task.forward : task.standard;
     const [fx, fy] = plan === 'forward' && task.forwardFallback ? task.forwardFallback : task.fallback;
     actor.defenseTask = { label: task.label, role: task.role, site: task.site, plan,

@@ -160,7 +160,7 @@ test('v8은 목표·경험치·능력과 급여 누적을 왕복하고 v6는 기
   const { world, player } = fixture();
   selectTraining(world, player.id, 'aim'); days(world, 13);
   const saved = createSave(world);
-  assert.equal(saved.schemaVersion, 47);
+  assert.equal(saved.schemaVersion, 48);
   const restored = restoreWorld(parseBackup(JSON.stringify(saved)));
   assert.deepEqual(restored, world);
   days(restored, 1);

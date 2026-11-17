@@ -19,6 +19,7 @@ export function economyPanel() {
     <p class="economy-rules">섬광탄 $200 · 최대 2초 탐지 거리·명중률 저하. 수류탄 $300 · 중심 최대 50 피해, 거리별 감소·방탄복 적용. 연막탄 $300 · 12초 시야 차단. 종류별 1개씩 보유하며 선수들이 감지한 적에 맞춰 자동 투척합니다. 아군도 영향을 받고 벽 너머에는 섬광·폭발 피해가 전달되지 않습니다. 미사용 투척물은 생존 시 유지하고 사망·진영 교대 자금 초기화 시 소멸합니다.</p>
     <p class="economy-rules">이번 구매 단계에서 산 무기는 시작 전 교체 시 구매액을 환불합니다. 이전 라운드에서 가져온 무기는 환불하지 않습니다. 무료 권총을 선택하면 이번 구매 무기를 취소할 수 있습니다. 생존자의 무기·남은 방탄복은 유지하고 사망자는 권총·방탄복 없음으로 복귀합니다. HP·탄약은 회복합니다. 경기 자금은 구단 운영 자금과 별개이며 이 연습 화면을 나가거나 초기화하면 사라집니다.</p>
     <p class="economy-rules match-reset-note">MR12에서는 후반전 시작 시 $800·권총·방탄복 없음, 연장 시작과 3라운드마다 $10,000·권총·방탄복 없음으로 전원 초기화합니다.</p></details>
+    <p class="economy-rules">무기별 이동 속도: ${WEAPONS.map(weapon => `${weapon.name} ${Math.round(weapon.moveMultiplier * 100)}%`).join(' · ')}. 돌격소총 100% 기준입니다.</p>
     <details class="economy-ledger"><summary>내 팀 최근 자금 내역</summary><ol></ol></details>
   </section>`;
 }
@@ -40,7 +41,7 @@ export function renderEconomy(panel, state, selectedActorId = 'home-1') {
     const owned = selected.weaponId === weapon.id;
     const affordable = selected.cash + refund >= weapon.price;
     const label = owned ? '보유 중' : !buying ? '구매 마감' : !selected.alive ? '사망' : !affordable ? '자금 부족' : refund ? '교체·환불' : '구매';
-    return `<button type="button" class="equipment-weapon${owned ? ' is-owned' : ''}" data-buy="${selected.id}" data-equipment="${weapon.id}" ${!canBuy || owned || !affordable ? 'disabled' : ''}>${equipmentImage(weapon.id)}<strong>${weapon.name}</strong><span>${money(weapon.price)}</span><small>${label}</small></button>`;
+    return `<button type="button" class="equipment-weapon${owned ? ' is-owned' : ''}" data-buy="${selected.id}" data-equipment="${weapon.id}" ${!canBuy || owned || !affordable ? 'disabled' : ''}>${equipmentImage(weapon.id)}<strong>${weapon.name}</strong><span>${money(weapon.price)}</span><small>이동 ${Math.round(weapon.moveMultiplier * 100)}% · 사거리 ${weapon.range}</small><small>${label}</small></button>`;
   }).join('');
   const utilities = THROWABLES.map(item => {
     const owned = Boolean(selected.throwables?.[item.id]);

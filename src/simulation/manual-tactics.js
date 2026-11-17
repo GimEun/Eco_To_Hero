@@ -7,11 +7,29 @@ export function setupManualRound(state) {
   state.manualPlans ??= Object.fromEntries(['attack', 'defense'].map(side => [side,
     { duration: 4, remaining: 4, players: {}, revision: 0 }]));
   state.round.manualProgress = {};
+  state.round.manualSmokeThrown = {};
   state.round.manualConsumed = false;
 }
 
 export function canEditManual(state) {
   return canEditTactics(state);
+}
+
+export function bombCarrierNumber(state, team) {
+  return team === 'home' ? state.manualPlans?.attack?.carrierNumber ?? 3 : 3;
+}
+
+export function setManualCarrier(state, actorId) {
+  const actor = state.actors.find(actor => actor.id === actorId);
+  if (!canEditManual(state) || state.round.started || !actor?.alive || actor.team !== 'home') {
+    return { ok: false, message: '구매 단계 또는 라운드 시작 전에 내 팀 폭탄 담당을 지정하세요.' };
+  }
+  state.manualPlans.attack.carrierNumber = actor.number;
+  if (state.round.attackTeam === 'home' && state.round.bomb.status === 'carried') {
+    state.round.bomb.carrierId = actor.id;
+    state.round.bomb.x = actor.x; state.round.bomb.y = actor.y;
+  }
+  return { ok: true, message: `${actor.nickname} 폭탄 담당 지정` };
 }
 
 export function manualRouteStart(state, map, actor, side) {
@@ -53,6 +71,35 @@ export function setManualRoute(state, map, actorId, side, cells, angle) {
     actor.objectiveKey = null;
   }
   return { ok: true, message: `${side === 'attack' ? '공격' : '수비'} 수동 경로를 적용했습니다.` };
+}
+
+export function validateManualSmoke(map, smoke) {
+  if (smoke == null) return { ok: true, smoke: null };
+  const point = smoke.cell ? cellCenter(map, smoke.cell) : {};
+  if (!Number.isInteger(smoke.cell?.x) || !Number.isInteger(smoke.cell?.y)
+    || !canOccupy(map, point.x, point.y, 1)) {
+    return { ok: false, message: '연막 목표는 벽이 없는 지도 안의 빈 칸을 선택하세요.' };
+  }
+  return { ok: true, smoke: { cell: { x: smoke.cell.x, y: smoke.cell.y } } };
+}
+
+export function setManualSmoke(state, map, actorId, side, smoke) {
+  if (!canEditManual(state) || !['attack', 'defense'].includes(side)
+    || !state.actors.some(actor => actor.id === actorId && actor.team === 'home')) return { ok: false, message: '내 팀의 편집 가능한 선수를 선택하세요.' };
+  const result = validateManualSmoke(map, smoke);
+  if (!result.ok) return result;
+  const plan = state.manualPlans[side];
+  if (!plan.remaining) return { ok: false, message: '적용 기간을 갱신하세요.' };
+  plan.smokes ??= {};
+  if (result.smoke) plan.smokes[actorId] = result.smoke;
+  else delete plan.smokes[actorId];
+  return { ok: true };
+}
+
+export function manualSmokeFor(state, actor) {
+  if (!state.round || actor.team !== 'home') return null;
+  const plan = state.manualPlans?.[actor.team === state.round.attackTeam ? 'attack' : 'defense'];
+  return plan?.remaining > 0 ? plan.smokes?.[actor.id] ?? null : null;
 }
 
 export function clearManualRoute(state, actorId, side) {
@@ -101,5 +148,5 @@ export function settleManualRound(state) {
   state.round.manualConsumed = true;
   const side = state.round.attackTeam === 'home' ? 'attack' : 'defense';
   const plan = state.manualPlans[side];
-  if (plan.remaining > 0 && Object.keys(plan.players).length) plan.remaining--;
+  if (plan.remaining > 0 && (Object.keys(plan.players).length || Object.keys(plan.smokes ?? {}).length)) plan.remaining--;
 }

@@ -10,8 +10,10 @@ import { setupMatch, updateMatch } from './match.js';
 import { setupDefensePlans } from './defense-tactics.js';
 import { setupAttackPlans } from './attack-tactics.js';
 import { effectiveStats } from '../game/happiness.js';
+import { fatigueModifier } from '../game/player-condition.js';
 import { setupOpponentStrategy } from './opponent-strategy.js';
 import { recordStrategy } from './strategy-history.js';
+import { updateHearing, captureSounds } from './sound.js';
 
 export const STEP_MS = 50;
 
@@ -34,8 +36,8 @@ export function createPractice(map, home, away, { combat = false, seed = 1, roun
         facing: teamIndex === 0 ? 0 : Math.PI, fieldOfView: Math.PI / 2, viewRange: 200,
         route, waypoint: 1, arrived: route.length === 1, blocked: false, trafficBlocked: false, crowdedGoal: null,
         navigationTick: null, yieldUntilTick: 0, yieldAngle: 0,
-        ...effectiveStats(player), alive: true, hp: 100, armor: 0, moving: false,
-        incomingFire: null, watchAngle: null, throwables: emptyThrowables(), flashUntilTick: 0, flashStrength: 0, nextUtilityTick: 0, utilityContact: null,
+        ...effectiveStats(player), fatiguePenalty: fatigueModifier(player), alive: true, hp: 100, armor: 0, moving: false,
+        incomingFire: null, watchAngle: null, pendingSound: null, heardSound: null, throwables: emptyThrowables(), flashUntilTick: 0, flashStrength: 0, nextUtilityTick: 0, utilityContact: null,
         grenadeEvades: 0, evadedGrenadeId: null, flashThreat: null, flashDodges: 0,
         ammo: TRAINING_RIFLE.magazineSize, reloadUntilTick: null, targetId: null, readyTick: 0, nextShotTick: 0,
         damageBy: {}, stats: { kills: 0, deaths: 0, assists: 0, damage: 0, shots: 0, hits: 0 },
@@ -57,9 +59,16 @@ export function createPractice(map, home, away, { combat = false, seed = 1, roun
 export function stepPractice(state, map) {
   if (state.complete || state.match?.complete || state.timeout?.active || state.economy?.phase === 'buy') return;
   if (state.round) state.round.started = true;
+  if (state.combat) updateHearing(state);
   if (state.round) prepareRound(state, map);
   else for (const actor of state.actors) actor.watchAngle = null;
   recordStrategy(state);
+  for (const actor of state.actors) {
+    if (!actor.alive || actor.action || actor.defenseSmoke || !actor.heardSound
+      || state.actors.some(target => target.alive && target.team !== actor.team && canSee(map, actor, target, state))) continue;
+    actor.watchAngle = Math.atan2(actor.heardSound.y - actor.y, actor.heardSound.x - actor.x);
+    actor.facing = actor.watchAngle;
+  }
   // 피격 방향은 실제 사격 위치의 스냅샷이다. 이미 교전 중이면 현재 표적을 유지한다.
   for (const actor of state.actors) {
     if (!actor.alive || !actor.incomingFire || state.tick - actor.incomingFire.tick > 20 || selectTarget(state, map, actor)) continue;
@@ -71,7 +80,11 @@ export function stepPractice(state, map) {
   moveActors(state, map, engaged, STEP_MS);
   if (state.combat) avoidFlashes(state, map);
   state.tick++;
-  if (state.combat) { updateThrowables(state, map); autoThrow(state, map); resolveCombat(state, map); }
+  if (state.combat) {
+    const eventStart = state.events.length;
+    updateThrowables(state, map); autoThrow(state, map); resolveCombat(state, map);
+    captureSounds(state, map, eventStart);
+  }
   else state.complete = state.actors.every(actor => actor.arrived);
   if (state.round) resolveRound(state);
   if (state.economy) updateEconomy(state);

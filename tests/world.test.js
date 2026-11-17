@@ -77,7 +77,7 @@ test('세계 v8 전체 데이터가 1MB 이내에서 JSON 왕복 후 동일하�
   const save = createSave(world);
   const json = JSON.stringify(save, null, 2);
   assert.ok(new TextEncoder().encode(json).byteLength < MAX_BACKUP_BYTES);
-  assert.equal(save.schemaVersion, 47);
+  assert.equal(save.schemaVersion, 48);
   const restored = restoreWorld(parseBackup(json));
   assert.deepEqual(restored, world);
   restored.players[0].aim = 1;
@@ -97,7 +97,7 @@ test('v1 저장은 구단명·자금·능력·ID를 보존해 결정적으로 �
   for (const key of ['name', 'balance', 'league', 'discipline']) assert.deepEqual(view[key], club[key]);
   assert.deepEqual(withoutIdentity(view.players), withoutIdentity(club.players));
   assert.doesNotThrow(() => validateWorld(first));
-  assert.equal(createSave(first).schemaVersion, 47);
+  assert.equal(createSave(first).schemaVersion, 48);
 });
 
 test('누락 참조·중복 소속·중복 ID·잘못된 정원·시드·플레이어 구단을 거부한다', () => {

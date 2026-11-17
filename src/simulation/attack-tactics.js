@@ -2,9 +2,11 @@ import { ATTACK_TACTICS } from '../data/attack-tactics.js';
 import { cellCenter, reachedDestination, findPath, canOccupy } from './geometry.js';
 import { selectTarget } from './combat.js';
 import { canEditTactics } from './timeout.js';
-import { manualPlanFor } from './manual-tactics.js';
+import { manualPlanFor, bombCarrierNumber } from './manual-tactics.js';
 import { defenseContactSite } from './defense-tactics.js';
 import { ROUND_RULES } from '../config/round.js';
+import { movementSpeed } from '../data/weapons.js';
+import { allocatedSite } from './site-allocation.js';
 
 export function setupAttackPlans(state, plans) {
   if (!plans || !Object.hasOwn(ATTACK_TACTICS, plans.home) || !Object.hasOwn(ATTACK_TACTICS, plans.away)) {
@@ -14,7 +16,7 @@ export function setupAttackPlans(state, plans) {
 }
 
 export function assignAttackTasks(state, map, team = null) {
-  const site = state.attackPlans ? map.tactics.attackSites[state.round.siteName] : null;
+  const targetSite = state.attackPlans ? map.tactics.attackSites[state.round.siteName] : null;
   if (!state.timeout?.active) state.round.attackCoordination = null;
   for (const actor of state.actors) {
     if (team && actor.team !== team) continue;
@@ -23,21 +25,25 @@ export function assignAttackTasks(state, map, team = null) {
     actor.tradeSupportKey = null;
     actor.tradeSupportPath = null;
     if (!state.attackPlans || actor.team !== state.round.attackTeam) continue;
+    const siteName = allocatedSite(state, actor) ?? state.round.siteName;
+    const site = map.tactics.attackSites[siteName];
     const plan = state.attackPlans[actor.team];
-    const index = actor.number - 1;
+    const carrierNumber = bombCarrierNumber(state, actor.team);
+    const index = actor.number === carrierNumber ? 2 : actor.number === 3 ? carrierNumber - 1 : actor.number - 1;
     const role = index < 2 ? 'entry' : index === 2 ? 'carrier' : 'support';
     const flank = role === 'support' && plan === 'split';
     const end = role === 'carrier' ? site.plant : role === 'entry' ? site.entry[index]
       : flank ? site.entry[index - 3] : site.support[index - 3];
-    actor.attackTask = { plan, role, label: role === 'entry' ? '선두 진입' : role === 'carrier' ? '폭탄 담당' : flank ? '우회 지원' : '후방 지원',
+    actor.attackTask = { plan, role, slot: index, site: siteName, label: role === 'entry' ? '선두 진입' : role === 'carrier' ? '폭탄 담당' : flank ? '우회 지원' : '후방 지원',
       lane: flank ? 'flank' : 'main', stage: 0, deployed: false,
       points: [...(flank ? site.flank : site.main), end].map(([x, y]) => cellCenter(map, { x, y })),
-      plant: cellCenter(map, { x: site.plant[0], y: site.plant[1] }),
-      guard: cellCenter(map, { x: site.guards[index][0], y: site.guards[index][1] }),
-      guardAngle: site.angles[index] };
+      plant: cellCenter(map, { x: targetSite.plant[0], y: targetSite.plant[1] }),
+      guard: cellCenter(map, { x: targetSite.guards[index][0], y: targetSite.guards[index][1] }),
+      guardAngle: targetSite.angles[index] };
   }
   if (state.attackPlans && state.round.bomb.status === 'carried' && !state.round.started) {
-    const carrier = state.actors.find(actor => actor.team === state.round.attackTeam && actor.number === 3 && actor.alive);
+    const carrier = state.actors.find(actor => actor.team === state.round.attackTeam
+      && actor.number === bombCarrierNumber(state, state.round.attackTeam) && actor.alive);
     if (carrier) state.round.bomb.carrierId = carrier.id;
   }
 }
@@ -89,7 +95,7 @@ export function considerSiteRotation(state, map) {
     previous = point;
   }
   // 교전/통행을 위한 5초 여유까지 확보할 수 있을 때만 전환한다.
-  if (state.tick + Math.ceil(length / (carrier.speed * 0.05)) + ROUND_RULES.plantTicks + 100 >= ROUND_RULES.limitTicks) return;
+  if (state.tick + Math.ceil(length / (movementSpeed(carrier) * 0.05)) + ROUND_RULES.plantTicks + 100 >= ROUND_RULES.limitTicks) return;
   const from = round.siteName;
   round.siteName = alternate.name;
   round.rotated = true;
@@ -146,14 +152,14 @@ export function prepareAttackCoordination(state, map) {
 
 function tradeSupport(state, map, actor) {
   if (!map || actor.attackTask.role !== 'support' || !state.round.attackCoordination?.committed) return null;
-  const entry = state.actors.find(ally => ally.team === actor.team && ally.number === actor.number - 3);
+  const entry = state.actors.find(ally => ally.team === actor.team && ally.attackTask?.slot === actor.attackTask.slot - 3);
   if (!entry) return null;
   const death = state.events.findLast(event => event.type === 'death' && event.actorId === entry.id && state.tick - event.tick <= 40);
   const contact = (state.round.attackContacts ?? []).find(item => state.tick - item.tick <= 20
     && item.id === (death?.killerId ?? entry.targetId));
   if (!contact || !death && (!entry.alive || !selectTarget(state, map, entry))) return null;
   const dx = contact.x - entry.x, dy = contact.y - entry.y, length = Math.hypot(dx, dy) || 1;
-  const sign = actor.number === 4 ? 1 : -1;
+  const sign = actor.attackTask.slot === 3 ? 1 : -1;
   const point = { x: entry.x - dx / length * 40 - dy / length * 28 * sign,
     y: entry.y - dy / length * 40 + dx / length * 28 * sign };
   const cell = { x: Math.floor(point.x / map.tileSize), y: Math.floor(point.y / map.tileSize) };

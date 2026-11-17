@@ -138,7 +138,7 @@ test('v7 저장은 날짜·기존 경험치/재정을 보존하고 기존 목표
   assert.deepEqual(restored.players[0].training.experience, player.training.experience);
   assert.deepEqual(restored.players[0].training.schedule, Array(7).fill('aim'));
   assert.equal(restored.weekDaysRemaining, 0);
-  assert.equal(createSave(restored).schemaVersion, 47);
+  assert.equal(createSave(restored).schemaVersion, 48);
   assert.deepEqual(restoreWorld(createSave(restored)), restored);
 });
 

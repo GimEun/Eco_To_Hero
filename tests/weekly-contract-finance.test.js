@@ -29,7 +29,7 @@ function legacy() {
 test('기존 계약·현금·분수 급여·미지급·과거 정산은 보존하고 다음 주에 새 규칙으로 정산한다', () => {
   const old = legacy(), before = structuredClone(old);
   const normalized = parseBackup(JSON.stringify(old));
-  assert.equal(normalized.schemaVersion, 47);
+  assert.equal(normalized.schemaVersion, 48);
   const world = restoreWorld(validateSave(normalized)), club = world.clubs[0];
   assert.deepEqual(old, before);
   assert.equal(world.day, 65);

@@ -1,6 +1,8 @@
-import { moveWithCollision, findPath, canSee } from './geometry.js';
+import { moveWithCollision, findPath, canSee, cellCenter } from './geometry.js';
 import { THROWABLES } from '../data/throwables.js';
 import { ROUND_RULES } from '../config/round.js';
+import { manualPlanFor } from './manual-tactics.js';
+import { movementSpeed } from '../data/weapons.js';
 
 const grenadeRadius = THROWABLES.find(item => item.id === 'grenade').radius;
 
@@ -59,6 +61,27 @@ function occupiedArrival(state, map, actor, target) {
   const critical = last && state.round && (actor.id === state.round.defuserId || actor.id === state.round.recovererId
     || actor.id === bomb.carrierId && !actor.objectiveKey?.startsWith('manual:') && !attackIntermediate);
   if (critical) return false;
+  const manual = actor.objectiveKey?.startsWith('manual:') ? manualPlanFor(state, actor) : null;
+  const finalPoint = manual ? cellCenter(map, manual.cells.at(-1)) : null;
+  // 같은 최종 지점의 아군 뒤에 도착한 선수도 충돌 없이 가까운 자리에서 경계를 시작한다.
+  const sharedFinal = finalPoint && Math.hypot(finalPoint.x - actor.route.at(-1).x, finalPoint.y - actor.route.at(-1).y) < 1e-7
+    && state.actors.some(other => {
+      if (other.id === actor.id || !other.alive || other.team !== actor.team || !other.arrived
+        || !state.round.manualProgress[other.id]?.arrived
+        || Math.hypot(other.route.at(-1).x - finalPoint.x, other.route.at(-1).y - finalPoint.y) > 1e-7
+        || Math.hypot(actor.x - finalPoint.x, actor.y - finalPoint.y)
+          > (actor.radius + other.radius + actor.radius / 2) * (state.actors.filter(ally => ally.alive && ally.team === actor.team).length - 1) + 6
+        || Math.hypot(actor.x - other.x, actor.y - other.y) > actor.radius + other.radius + actor.radius / 2 + 1e-7) return false;
+      const clear = moveWithCollision(map, actor, other);
+      return Math.hypot(clear.x - other.x, clear.y - other.y) < 1e-7;
+    });
+  if (sharedFinal) {
+    actor.crowdedGoal = { ...finalPoint };
+    actor.waypoint = actor.route.length;
+    actor.arrived = true;
+    return true;
+  }
+  if (manual) return false;
   const occupied = state.actors.some(other => other.id !== actor.id && other.alive
     && Math.hypot(other.x - target.x, other.y - target.y) <= other.radius
     && Math.hypot(actor.x - target.x, actor.y - target.y) <= actor.radius + other.radius + 4);
@@ -113,7 +136,7 @@ export function moveActors(state, map, engaged, stepMs) {
         : Math.atan2(actor.y - grenade.to.y, actor.x - grenade.to.x);
       const target = { x: actor.x + Math.cos(angle) * (grenadeRadius + actor.radius + 12),
         y: actor.y + Math.sin(angle) * (grenadeRadius + actor.radius + 12) };
-      const next = moveAroundPlayers(map, actor, target, actor.speed * stepMs / 1000, state.actors, state.tick);
+      const next = moveAroundPlayers(map, actor, target, movementSpeed(actor) * stepMs / 1000, state.actors, state.tick);
       if (Math.hypot(next.x - grenade.to.x, next.y - grenade.to.y) > separation + 1e-7) {
         actor.x = next.x; actor.y = next.y; actor.moving = true;
         actor.crowdedGoal = null;
@@ -129,9 +152,10 @@ export function moveActors(state, map, engaged, stepMs) {
       if (actor.evadedGrenadeId !== grenadeId) { actor.evadedGrenadeId = grenadeId; actor.grenadeEvades = (actor.grenadeEvades ?? 0) + 1; }
       continue;
     }
-    if (actor.entryWaiting || actor.smokeGuarding || actor.arrived || engaged.has(actor.id) && !actor.retreating) continue;
+    if (actor.entryWaiting || actor.smokeGuarding || actor.smokeWatching || actor.arrived || engaged.has(actor.id) && !actor.retreating) continue;
+    const preserveRoute = actor.objectiveKey?.startsWith('manual:') && Boolean(manualPlanFor(state, actor));
     actor.navigationTick ??= state.tick;
-    if (state.tick - actor.navigationTick >= 20) {
+    if (!preserveRoute && state.tick - actor.navigationTick >= 20) {
       const goal = actor.route.at(-1);
       const path = findPath(map, { x: Math.floor(actor.x / map.tileSize), y: Math.floor(actor.y / map.tileSize) },
         { x: Math.floor(goal.x / map.tileSize), y: Math.floor(goal.y / map.tileSize) }, actor.radius,
@@ -147,7 +171,7 @@ export function moveActors(state, map, engaged, stepMs) {
     }
     const spacing = formationScale(state, actor, engaged);
     actor.keepingDistance = spacing < 1;
-    let remaining = actor.speed * stepMs / 1000 * spacing;
+    let remaining = movementSpeed(actor) * stepMs / 1000 * spacing;
     while (remaining > 1e-7 && !actor.arrived) {
       const target = actor.route[actor.waypoint];
       const distance = Math.hypot(target.x - actor.x, target.y - actor.y);
@@ -166,6 +190,28 @@ export function moveActors(state, map, engaged, stepMs) {
         continue;
       }
       const travel = Math.min(remaining, distance, actor.radius / 2);
+      if (preserveRoute) {
+        const dx = (target.x - actor.x) / distance, dy = (target.y - actor.y) / distance;
+        const direct = moveWithCollision(map, actor, { x: actor.x + dx * travel, y: actor.y + dy * travel });
+        const waiting = state.actors.some(ally => {
+          if (ally.id === actor.id || !ally.alive || ally.team !== actor.team || clearOfPlayers(actor, direct, [ally])) return false;
+          const next = ally.route[ally.waypoint];
+          if (ally.arrived || ally.action || engaged.has(ally.id) || !next) return true;
+          const length = Math.hypot(next.x - ally.x, next.y - ally.y);
+          if (length < 1e-7) return false;
+          const ax = (next.x - ally.x) / length, ay = (next.y - ally.y) / length;
+          if (ax * dx + ay * dy < 0.8) return false;
+          // 합류하는 두 선수도 공통 진행 방향으로 앞뒤를 비교해 서로 기다리지 않는다.
+          const ahead = (ally.x - actor.x) * (dx + ax) + (ally.y - actor.y) * (dy + ay);
+          return ahead > 1e-7 || Math.abs(ahead) <= 1e-7 && ally.id < actor.id;
+        });
+        if (waiting) {
+          actor.trafficBlocked = true;
+          actor.blocked = false;
+          actor.yieldUntilTick = 0;
+          break;
+        }
+      }
       const next = moveAroundPlayers(map, actor, target, travel, state.actors, state.tick);
       const moved = Math.hypot(next.x - actor.x, next.y - actor.y);
       if (moved < 1e-7) {

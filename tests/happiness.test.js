@@ -131,7 +131,7 @@ test('v10 복원은 기존 세계를 보존하고 행복도 70부터 시작하�
   assert.equal(restored.players[0].training.experience.aim, player.training.experience.aim);
   days(restored, 7); assert.equal(restored.players[0].morale.happiness, 84);
   assert.deepEqual(restoreWorld(parseBackup(JSON.stringify(createSave(restored)))), restored);
-  assert.equal(createSave(restored).schemaVersion, 47);
+  assert.equal(createSave(restored).schemaVersion, 48);
 });
 
 test('잘못된 행복도·연속 행동·미래/누락 날짜와 잘못된 조합을 저장에서 거부한다', () => {

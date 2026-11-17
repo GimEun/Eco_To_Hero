@@ -121,7 +121,7 @@ test('최근 12회 주간 정산·장기 진행·저장 왕복을 보존한다',
   assert.equal(club.finance.settlements.length, 12);
   assert.equal(club.finance.settlements[0].day, 15);
   assert.equal(club.finance.settlements.at(-1).day, 92);
-  const saved = createSave(world); assert.equal(saved.schemaVersion, 47);
+  const saved = createSave(world); assert.equal(saved.schemaVersion, 48);
   assert.deepEqual(restoreWorld(parseBackup(JSON.stringify(saved))), world);
   assert.equal(advanceWeek(world).ok, true);
   assert.equal(club.finance.settlements.length, 12);

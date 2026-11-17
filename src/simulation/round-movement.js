@@ -1,11 +1,12 @@
 import { cellCenter, findPath, canOccupy, canSee, moveWithCollision, rayDistance } from './geometry.js';
 import { ROUND_RULES } from '../config/round.js';
 import { MATCH_RULES } from '../config/match.js';
-import { weaponFor } from '../data/weapons.js';
+import { weaponFor, movementSpeed } from '../data/weapons.js';
 import { selectTarget } from './combat.js';
 import { defenseDestination, defenseContactSite } from './defense-tactics.js';
 import { attackDestination, considerSiteRotation, prepareAttackCoordination } from './attack-tactics.js';
 import { manualDestination, manualPlanFor } from './manual-tactics.js';
+import { defenseSmokeDestination } from './defense-smoke.js';
 
 function crossesSmoke(from, to, smoke, margin = 0) {
   const dx = to.x - from.x, dy = to.y - from.y;
@@ -46,7 +47,7 @@ function prepareSmokeGuards(state, map) {
     const risks = round.smokeRisks[actor.team];
     if (!risks.some(risk => risk.key === actor.smokeGuardKey)) actor.smokeGuardKey = null;
     if (!actor.alive || urgent || actor.retreating || manualPlanFor(state, actor)
-      || round.action?.actorId === actor.id || actor.arrived || selectTarget(state, map, actor)) continue;
+      || actor.defenseSmoke || round.action?.actorId === actor.id || actor.arrived || selectTarget(state, map, actor)) continue;
     const next = actor.route[actor.waypoint];
     const risk = risks.find(risk => next && Math.hypot(actor.x - risk.x, actor.y - risk.y) > risk.radius + actor.radius
       && Math.hypot(actor.x - risk.x, actor.y - risk.y) <= risk.radius + 70 && crossesSmoke(actor, next, risk, actor.radius));
@@ -118,7 +119,7 @@ function defuseTravelTicks(state, map, actor) {
     distance += Math.hypot(point.x - previous.x, point.y - previous.y);
     previous = point;
   }
-  return Math.ceil(Math.max(0, distance - 12) / (actor.speed * 0.05));
+  return Math.ceil(Math.max(0, distance - 12) / (movementSpeed(actor) * 0.05));
 }
 
 function equipmentCarriesOver(state) {
@@ -181,7 +182,7 @@ function savingPoint(state, map, actor) {
   return destination;
 }
 
-export function prepareRoundMovement(state, map, site) {
+export function prepareRoundMovement(state, map, site, manualPlantCarrierId = null) {
   const round = state.round;
   const bomb = round.bomb;
   const defenders = state.actors.filter(actor => actor.alive && actor.team !== round.attackTeam);
@@ -236,11 +237,24 @@ export function prepareRoundMovement(state, map, site) {
     actor.action = null;
     actor.retreating = false;
     actor.watchAngle = null;
-    if (!actor.alive) continue;
+    actor.smokeWatching = false;
+    if (!actor.alive) { actor.defenseSmoke = null; continue; }
     const attacking = actor.team === round.attackTeam;
     const manual = manualDestination(state, map, actor);
     const carrying = bomb.carrierId === actor.id;
+    if (carrying && actor.id === manualPlantCarrierId) {
+      const target = selectTarget(state, map, actor);
+      const look = target ?? round.attackContact;
+      actor.watchAngle = look ? Math.atan2(look.y - actor.y, look.x - actor.x) : manual?.angle ?? actor.facing;
+      actor.facing = actor.watchAngle;
+      actor.intent = target ? '사이트 내 교전 · 교전 종료 후 설치' : '사이트 도착 · 폭탄 설치 준비';
+      routeTo(actor, map, actor, `manual-site:${actor.id}:${site.name}`);
+      actor.arrived = true;
+      actor.waypoint = actor.route.length;
+      continue;
+    }
     if (manual && bomb.status !== 'planted' && !(attacking && (bomb.status === 'dropped' || carrying && manual.arrived))) {
+      actor.defenseSmoke = null;
       actor.intent = manual.arrived ? '수동 지점 경계' : '수동 경유점 이동';
       if (manual.arrived) {
         const enemies = attacking ? defenders : attackers;
@@ -250,6 +264,31 @@ export function prepareRoundMovement(state, map, site) {
       }
       routeTo(actor, map, manual.point, manual.key);
       continue;
+    }
+    const smokeDestination = defenseSmokeDestination(state, map, actor);
+    if (smokeDestination) {
+      actor.intent = smokeDestination.intent;
+      actor.watchAngle = smokeDestination.watchAngle;
+      actor.facing = actor.watchAngle;
+      routeTo(actor, map, smokeDestination.point, smokeDestination.key);
+      continue;
+    }
+    const sound = actor.heardSound;
+    const visual = (attacking ? round.attackContact : round.defenseContact)
+      || state.actors.some(target => target.alive && target.team !== actor.team && canSee(map, actor, target, state));
+    if (sound && !visual && !manual && bomb.status === 'carried' && !carrying
+      && ROUND_RULES.limitTicks - state.tick > ROUND_RULES.plantTicks + 200) {
+      const key = `sound:${sound.x}:${sound.y}`;
+      const reachable = actor.objectiveKey === key || findPath(map,
+        { x: Math.floor(actor.x / map.tileSize), y: Math.floor(actor.y / map.tileSize) },
+        { x: Math.floor(sound.x / map.tileSize), y: Math.floor(sound.y / map.tileSize) }, actor.radius).length;
+      if (reachable) {
+        actor.watchAngle = Math.atan2(sound.y - actor.y, sound.x - actor.x);
+        actor.facing = actor.watchAngle;
+        actor.intent = `${sound.kind === 'shot' ? '총성' : '발소리'} 위치 확인`;
+        routeTo(actor, map, sound, key);
+        continue;
+      }
     }
     if (bomb.status === 'planted') {
       if (!attacking && round.saveReason) {

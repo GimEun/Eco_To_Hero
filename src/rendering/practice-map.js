@@ -1,6 +1,8 @@
 import { wallRectangles, visionPolygon, cellCenter, findPath } from '../simulation/geometry.js';
 import { visibleOpponents } from '../simulation/practice.js';
-import { manualPlanFor, manualRouteStart } from '../simulation/manual-tactics.js';
+import { manualPlanFor, manualRouteStart, manualSmokeFor } from '../simulation/manual-tactics.js';
+import { THROWABLES } from '../data/throwables.js';
+import { weaponFor } from '../data/weapons.js';
 
 const COLORS = { home: '#8fb5ff', away: '#d0a8f4' };
 
@@ -45,7 +47,7 @@ export function drawPractice(context, map, state, selectedId, manualPreview = un
   }
 
   const selected = state.actors.find(actor => actor.id === selectedId);
-  const manual = manualPreview ?? (selected ? manualPlanFor(state, selected) : null);
+  const manual = manualPreview ?? (selected ? { ...manualPlanFor(state, selected), smoke: manualSmokeFor(state, selected) } : null);
   const detected = new Set(visibleOpponents(state, map, selectedId).map(actor => actor.id));
   if (selected?.alive) {
     context.beginPath();
@@ -65,6 +67,11 @@ export function drawPractice(context, map, state, selectedId, manualPreview = un
     context.setLineDash([]);
     const end = selected.route.at(-1);
     context.strokeRect(end.x - 7, end.y - 7, 14, 14);
+    if (state.combat) {
+      const weapon = weaponFor(selected);
+      context.beginPath(); context.arc(selected.x, selected.y, weapon.range, 0, Math.PI * 2);
+      context.setLineDash([8, 6]); context.strokeStyle = '#d4b47c'; context.lineWidth = 1.5; context.stroke(); context.setLineDash([]);
+    }
   }
 
   for (const smoke of state.smokes ?? []) {
@@ -84,7 +91,7 @@ export function drawPractice(context, map, state, selectedId, manualPreview = un
     context.strokeRect(wall.x + 1, wall.y + 1, wall.width - 2, wall.height - 2);
   }
 
-  if (manual?.cells.length && selected?.team === 'home') {
+  if (manual?.cells?.length && selected?.team === 'home') {
     let start = manualRouteStart(state, map, selected, manual.side);
     context.strokeStyle = '#f3cf83'; context.fillStyle = '#f3cf83'; context.lineWidth = 2;
     context.setLineDash([4, 4]);
@@ -104,6 +111,15 @@ export function drawPractice(context, map, state, selectedId, manualPreview = un
     context.beginPath(); context.moveTo(end.x, end.y);
     context.lineTo(end.x + Math.cos(manual.angle) * 42, end.y + Math.sin(manual.angle) * 42);
     context.stroke();
+  }
+
+  if (manual?.smoke && selected?.team === 'home') {
+    const to = cellCenter(map, manual.smoke.cell);
+    context.strokeStyle = '#b5c0ce'; context.lineWidth = 2; context.setLineDash([3, 5]);
+    const radius = THROWABLES.find(item => item.id === 'smoke').radius;
+    context.beginPath(); context.arc(to.x, to.y, radius, 0, Math.PI * 2); context.stroke(); context.setLineDash([]);
+    context.fillStyle = '#e8edf5'; context.font = '12px sans-serif'; context.textAlign = 'center';
+    context.fillText('연막 목표 · 자동 투척', to.x, to.y - radius - 6);
   }
 
   if (selected?.alive && selected.defenseTask && state.round?.bomb.status !== 'planted') {
@@ -200,6 +216,11 @@ export function drawPractice(context, map, state, selectedId, manualPreview = un
     context.font = 'bold 12px sans-serif';
     context.textAlign = 'center';
     context.fillText(String(actor.number), actor.x, actor.y + 4);
+    if (actor.id === selectedId) {
+      context.fillStyle = '#edf1ff'; context.font = '12px sans-serif';
+      context.fillText(actor.nickname, actor.x, actor.y - 32);
+      if (state.combat) { context.font = '11px sans-serif'; context.fillText(weaponFor(actor).name, actor.x, actor.y + 36); }
+    }
     if (state.combat) {
       context.fillStyle = '#1d2535'; context.fillRect(actor.x - 13, actor.y + 17, 26, 4);
       context.fillStyle = COLORS[actor.team]; context.fillRect(actor.x - 13, actor.y + 17, 26 * actor.hp / 100, 4);

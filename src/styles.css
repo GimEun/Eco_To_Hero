@@ -382,6 +382,11 @@ tbody tr:hover { background: var(--surface); }
 .strategy-options button[aria-expanded="true"] { border-color: var(--accent); background: var(--raised); }
 .manual-editor .input-hint { line-height: 1.8; }
 .manual-message { color: var(--accent); font-size: 12px; }
+.strategy-library, .site-allocation { min-width: 0; margin: 16px 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--panel-radius); }
+.strategy-library .practice-controls { flex-wrap: wrap; }
+.strategy-library input, .strategy-library select { min-width: 0; max-width: 100%; }
+.strategy-library input { flex: 1 1 160px; min-height: 44px; padding: 12px; border: 1px solid var(--control-border); border-radius: var(--panel-radius); background: var(--surface-inset); color: var(--text); font: inherit; font-size: 12px; }
+.strategy-library-message { overflow-wrap: anywhere; }
 .round-status { margin: 0 0 20px; }
 .tactics-description { margin: 0 0 20px; }
 .practice-controls [hidden], .economy-panel[hidden] { display: none; }

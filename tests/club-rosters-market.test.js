@@ -124,7 +124,7 @@ test('저장은 세계 AI만 후보 3명을 허용하고 기존 v14 세계는 �
     attach(invalid, club, 1); assert.throws(() => createSave(invalid), /정원/);
   }
   const club = world.clubs.find(club => club.leagueId === 'world'); attach(world, club, 3);
-  const save = createSave(world); assert.equal(save.schemaVersion, 47); assert.deepEqual(restoreWorld(save), world);
+  const save = createSave(world); assert.equal(save.schemaVersion, 48); assert.deepEqual(restoreWorld(save), world);
   const wrongVersion = structuredClone(save); wrongVersion.schemaVersion = 14;
   assert.throws(() => restoreWorld(wrongVersion), /정원/);
   attach(world, club, 1); assert.throws(() => createSave(world), /정원/);

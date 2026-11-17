@@ -4,11 +4,12 @@ import { createClub } from '../src/game/create-club.js';
 import { createWorld } from '../src/game/create-world.js';
 import { getClubView } from '../src/game/world-selectors.js';
 import { RELAY_MAP } from '../src/data/maps/relay.js';
-import { BASIC_PISTOL, TRAINING_RIFLE, weaponFor } from '../src/data/weapons.js';
+import { BASIC_PISTOL, TRAINING_RIFLE, weaponFor, movementSpeed, WEAPONS } from '../src/data/weapons.js';
+import { moveActors } from '../src/simulation/actor-movement.js';
 import { createPractice, stepPractice, advancePractice } from '../src/simulation/practice.js';
 import { resolveCombat } from '../src/simulation/combat.js';
 import { prepareRound } from '../src/simulation/round.js';
-import { buyRifle, startEconomyRound, updateEconomy, nextEconomyRound } from '../src/simulation/economy.js';
+import { buyRifle, buyEquipment, startEconomyRound, updateEconomy, nextEconomyRound } from '../src/simulation/economy.js';
 
 function sample(seed = 42, attackTeam = 'home', siteName = 'A') {
   const world = createWorld(createClub('구매 구단').club, seed);
@@ -16,6 +17,23 @@ function sample(seed = 42, attackTeam = 'home', siteName = 'A') {
     { economy: true, seed, attackTeam, siteName });
   return { world, state };
 }
+
+test('무기별 승인 배율은 실제 이동 거리와 구매 교체에 즉시 적용한다', () => {
+  const expected = { 'basic-pistol': 88, smg: 92, 'training-rifle': 80, shotgun: 76, sniper: 68, 'machine-gun': 64 };
+  const map = { columns: 20, rows: 10, tileSize: 40, walls: [] };
+  for (const weapon of WEAPONS) {
+    const { state } = sample(), actor = state.actors[0];
+    actor.cash = 16000;
+    if (weapon.id !== BASIC_PISTOL.id) assert.equal(buyEquipment(state, actor.id, weapon.id).ok, true);
+    assert.equal(movementSpeed(actor), expected[weapon.id]);
+    assert.equal(actor.speed, 80);
+    state.actors = [actor]; state.round = null;
+    Object.assign(actor, { x: 100, y: 100, route: [{ x: 100, y: 100 }, { x: 500, y: 100 }], waypoint: 1, arrived: false });
+    for (let tick = 0; tick < 20; tick++) { state.tick = tick; moveActors(state, map, new Set(), 50); }
+    assert.ok(Math.abs(actor.x - 100 - expected[weapon.id]) < 1e-7, weapon.id);
+    assert.equal(actor.y, 100);
+  }
+});
 
 test('구매 단계는 선수마다 $800·무료 권총으로 시작하고 시간·행동이 진행되지 않는다', () => {
   const { state } = sample();

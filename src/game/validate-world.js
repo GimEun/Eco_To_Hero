@@ -1,3 +1,4 @@
+import { validateStrategyLibrary } from './strategy-library.js';
 import { createCounseling,addCounselContent } from './counseling.js';
 import { validateCounseling } from './validate-counseling.js';
 import { validateYearAdvance } from './year-advance.js';
@@ -82,7 +83,7 @@ export function validateLegacyClub(club) {
   };
 }
 
-export function validateWorld(world, { legacyRoster = false, legacyContracts = false, legacyTime = false, legacyFinance = false, legacyTraining = false, legacySchedule = false, legacyTeamTraining = false, legacyWeekly = false, legacyHappiness = false, legacyEvents = false, legacyDevelopment = false, legacyCondition = false, legacyAiRoster = false, legacyHolding = false, legacySponsor = false, legacyCoach = false, legacyFacilities = false, legacyCash = false, legacyStocks = false, legacyStockSignals = false, legacySeason = false, legacyActive = false, legacyWeekSchedule = false, legacyBroadcastGoal = false, legacyTiebreaks = false, legacyOfficialRecords = false, legacySeasonCalendar = false, legacyPlayoffs = false, legacyCitySeason = false, legacyCityFinals = false, legacyProvince = false, legacyNational = false, legacyWorldGroups = false, legacyWorldRanked = false, legacyWorldFinals = false, legacyFreeSchedule = false, legacyYears = false, legacyYearAdvance = false, legacyAiGrowth = false, legacyMatchReports = false, legacyCounseling = false, legacyCounselContent = false } = {}) {
+export function validateWorld(world, { legacyRoster = false, legacyContracts = false, legacyTime = false, legacyFinance = false, legacyTraining = false, legacySchedule = false, legacyTeamTraining = false, legacyWeekly = false, legacyHappiness = false, legacyEvents = false, legacyDevelopment = false, legacyCondition = false, legacyAiRoster = false, legacyHolding = false, legacySponsor = false, legacyCoach = false, legacyFacilities = false, legacyCash = false, legacyStocks = false, legacyStockSignals = false, legacySeason = false, legacyActive = false, legacyWeekSchedule = false, legacyBroadcastGoal = false, legacyTiebreaks = false, legacyOfficialRecords = false, legacySeasonCalendar = false, legacyPlayoffs = false, legacyCitySeason = false, legacyCityFinals = false, legacyProvince = false, legacyNational = false, legacyWorldGroups = false, legacyWorldRanked = false, legacyWorldFinals = false, legacyFreeSchedule = false, legacyYears = false, legacyYearAdvance = false, legacyAiGrowth = false, legacyMatchReports = false, legacyCounseling = false, legacyCounselContent = false, legacyStrategyLibrary = false } = {}) {
   if (!isObject(world) || !Number.isInteger(world.seed) || world.seed < 0 || world.seed > 0xffffffff) {
     throw new Error('세계 생성 시드가 올바르지 않습니다.');
   }
@@ -183,6 +184,7 @@ export function validateWorld(world, { legacyRoster = false, legacyContracts = f
   for(const season of [citySeason,provinceSeason,nationalSeason,worldSeason].filter(Boolean))if(season.startedDay<seasonYears.startedDay)throw new Error('현재 연도와 리그 시작일이 일치하지 않습니다.');
   if(legacyFreeSchedule || seasonCalendar.phase==='offseason')completeSeason(result);
   result.aiGrowth = legacyAiGrowth ? createAiGrowth(day) : validateAiGrowth(world.aiGrowth, result);
+  result.strategyLibrary = legacyStrategyLibrary ? {} : validateStrategyLibrary(world.strategyLibrary);
   result.matchReports = legacyMatchReports ? [] : validateMatchReports(world.matchReports, result);
   result.counseling = legacyCounseling ? createCounseling(result) : validateCounseling(legacyCounselContent ? addCounselContent(result,world.counseling) : world.counseling, result);
   result.yearAdvance = validateYearAdvance(legacyYearAdvance ? null : world.yearAdvance, result);

@@ -101,7 +101,7 @@ test('저장 v8은 영입·주전 교체·자금·방출 결과를 왕복 복원
   const world = sample(), club = clubFor(world), player = candidates(world)[0];
   recruitPlayer(world, player.id); replaceStarter(world, player.id, club.lineupIds[1]);
   const saved = createSave(world);
-  assert.equal(saved.schemaVersion, 47);
+  assert.equal(saved.schemaVersion, 48);
   const restored = restoreWorld(parseBackup(JSON.stringify(saved)));
   assert.deepEqual(restored, world);
   releasePlayer(restored, clubFor(restored).playerIds[0]);
@@ -122,7 +122,7 @@ test('v2의 기존 명단·능력·자금·순서를 보존해 주전 5명으로
   }
   assert.deepEqual(restored.players, world.players);
   assert.deepEqual(old, before);
-  assert.equal(createSave(restored).schemaVersion, 47);
+  assert.equal(createSave(restored).schemaVersion, 48);
   old.world.clubs[0].playerIds.push(candidates(restored)[0].id);
   assert.throws(() => parseBackup(JSON.stringify(old)));
 });

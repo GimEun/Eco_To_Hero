@@ -161,7 +161,7 @@ test('연막 경계가 있는 실제 고정 틱 계산은 프레임 분할과 �
   assert.deepEqual(a.state, b.state);
 });
 
-test('양 팀 수비도 위험 연막 앞에서 경계하며 실제 시야의 교전 표적은 경계보다 우선한다', () => {
+test('양 팀 수비는 연막 주변 시야를 확보하며 실제 시야의 교전 표적은 주변 확인보다 우선한다', () => {
   for (const team of ['home', 'away']) {
     const f = smokeFixture(PRACTICE_MAPS[0], team);
     const { state, map, observer } = f;
@@ -179,9 +179,10 @@ test('양 팀 수비도 위험 연막 앞에서 경계하며 실제 시야의 �
     observer.route = [{ x: 340, y: 260 }, { x: 500, y: 260 }];
     observer.waypoint = 1;
     prepareRound(state, map);
-    assert.equal(observer.smokeGuarding, true);
+    assert.ok(observer.defenseSmoke);
     Object.assign(f.enemy, { x: 350, y: 270 });
     prepareRound(state, map);
     assert.equal(observer.smokeGuarding, false);
+    assert.equal(observer.defenseSmoke, null);
   }
 });

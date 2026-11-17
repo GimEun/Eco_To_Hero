@@ -1,6 +1,7 @@
 import { THROWABLES } from '../data/throwables.js';
-import { canSee, canOccupy, rayDistance } from './geometry.js';
+import { canSee, canOccupy, rayDistance, cellCenter } from './geometry.js';
 import { applyCombatDamage } from './combat.js';
+import { manualSmokeFor } from './manual-tactics.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const clearLine = (map, from, to) => distance(from, to) <= rayDistance(map, from, Math.atan2(to.y - from.y, to.x - from.x), distance(from, to)) + 1e-9;
@@ -74,21 +75,27 @@ export function autoThrow(state, map) {
   if (state.complete || state.timeout?.active || state.economy?.phase !== 'combat') return;
   for (const actor of state.actors.filter(actor => actor.alive && Object.values(actor.throwables ?? {}).some(Boolean)).sort((a, b) => a.id.localeCompare(b.id))) {
     if (actor.action || actor.flashUntilTick > state.tick || actor.nextUtilityTick > state.tick) continue;
+    const plannedSmoke = manualSmokeFor(state, actor);
+    const smokePoint = plannedSmoke ? cellCenter(map, plannedSmoke.cell) : null;
+    const manualReady = actor.throwables?.smoke && smokePoint && !state.round.manualSmokeThrown[actor.id]
+      && distance(actor, smokePoint) <= 220 && clearLine(map, actor, smokePoint);
     const visible = state.actors.filter(other => other.alive && other.team !== actor.team && canSee(map, actor, other, state)
       && distance(actor, other) <= 220).sort((a, b) => distance(actor, a) - distance(actor, b) || a.id.localeCompare(b.id));
     const underFire = actor.incomingFire && state.tick - actor.incomingFire.tick <= 40;
-    const target = visible[0] ?? (underFire && actor.throwables.smoke ? { ...actor.incomingFire, id: 'incoming-fire' } : null);
+    const target = manualReady ? { ...smokePoint, id: 'manual-smoke' }
+      : visible[0] ?? (underFire && actor.throwables.smoke ? { ...actor.incomingFire, id: 'incoming-fire' } : null);
     if (!target) { actor.utilityContact = null; continue; }
     if (actor.utilityContact?.targetId !== target.id) actor.utilityContact = { targetId: target.id, tick: state.tick };
-    if (distance(actor, target) < 75) continue;
-    for (const id of ['grenade', 'flashbang', 'smoke']) {
+    if (!manualReady && distance(actor, target) < 75) continue;
+    for (const id of manualReady ? ['smoke'] : ['grenade', 'flashbang', 'smoke']) {
       if (!actor.throwables?.[id]) continue;
       if (!visible.length && id !== 'smoke') continue;
       const item = THROWABLES.find(entry => entry.id === id);
+      if (id === 'smoke' && plannedSmoke && !manualReady) continue;
       const utilityReaction = Math.max(6, Math.ceil((600 - actor.intelligence * 4) / 50)) + 4
         + (((state.seed ?? 0) + actor.number * 7 + state.economy.roundNumber) >>> 0) % 7;
       if (id !== 'smoke' && state.tick - actor.utilityContact.tick < utilityReaction) continue;
-      if (id === 'smoke') {
+      if (id === 'smoke' && !manualReady) {
         const coveringObjective = state.round?.bomb.status === 'planted' || state.actors.some(ally => ally.alive && ally.team === actor.team && ally.action);
         const reaction = Math.max(8, 22 - Math.floor(actor.intelligence / 10))
           + (((state.seed ?? 0) + actor.number * 17 + state.economy.roundNumber * 13 + (actor.team === 'home' ? 11 : 23)) >>> 0) % 25;
@@ -96,7 +103,7 @@ export function autoThrow(state, map) {
         if (!(underFire || visible.length >= 2 || actor.hp <= 50 || coveringObjective)
           || state.tick - actor.utilityContact.tick < delay || distance(actor, target) < 100) continue;
       }
-      const point = id === 'smoke' ? { x: actor.x + (target.x - actor.x) * 0.75, y: actor.y + (target.y - actor.y) * 0.75 } : { x: target.x, y: target.y };
+      const point = id === 'smoke' && !manualReady ? { x: actor.x + (target.x - actor.x) * 0.75, y: actor.y + (target.y - actor.y) * 0.75 } : { x: target.x, y: target.y };
       if (!canOccupy(map, point.x, point.y, 1) || !clearLine(map, actor, point)) continue;
       if (id === 'grenade' && state.actors.some(ally => ally.alive && ally.team === actor.team && distance(ally, point) < item.radius * 0.6)) continue;
       if (id === 'flashbang' && target.flashUntilTick > state.tick) continue;
@@ -110,9 +117,10 @@ export function autoThrow(state, map) {
         const friendly = exposed.filter(other => other.team === actor.team);
         if (friendly.length > exposed.length - friendly.length) continue;
       }
-      if (state.projectiles.some(other => other.kind === id && state.actors.find(owner => owner.id === other.actorId)?.team === actor.team && distance(other.to, point) < item.radius)) continue;
-      if (id === 'smoke' && state.smokes.some(other => distance(other, point) < item.radius + other.radius)) continue;
+      if (!manualReady && state.projectiles.some(other => other.kind === id && state.actors.find(owner => owner.id === other.actorId)?.team === actor.team && distance(other.to, point) < item.radius)) continue;
+      if (id === 'smoke' && !manualReady && state.smokes.some(other => distance(other, point) < item.radius + other.radius)) continue;
       actor.throwables[id]--;
+      if (manualReady) state.round.manualSmokeThrown[actor.id] = true;
       actor.nextUtilityTick = state.tick + 30;
       actor.nextShotTick = Math.max(actor.nextShotTick, state.tick + 10);
       const projectile = { actorId: actor.id, kind: id, from: { x: actor.x, y: actor.y }, to: point, throwTick: state.tick, detonateTick: state.tick + item.delayTicks };

@@ -102,7 +102,7 @@ test('정규·반복 연장의 종료 점수만 받으며 잘못된 점수와 �
 test('v24는 일정·결과를 저장하고 v23 이전은 원본 세계를 보존해 빈 시즌만 보충한다', () => {
   const world = sample();
   const saved = createSave(world);
-  assert.equal(saved.schemaVersion, 47);
+  assert.equal(saved.schemaVersion, 48);
   assert.ok(new TextEncoder().encode(JSON.stringify(saved, null, 2)).byteLength < MAX_BACKUP_BYTES);
   recordPcMatch(world.pcSeason, world.pcSeason.fixtures[0].id, { homeScore: 13, awayScore: 11 });
   assert.deepEqual(restoreWorld(createSave(world)), world);

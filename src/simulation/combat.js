@@ -20,6 +20,10 @@ export function hitProbability(actor, target, state = null) {
   return Math.max(0.05, Math.min(0.95, probability * (state && actor.flashUntilTick > state.tick ? 1 - 0.6 * (actor.flashStrength ?? 1) : 1)));
 }
 
+export function reactionTicks(actor) {
+  return Math.max(4, Math.ceil((600 - actor.intelligence * 4) / 50));
+}
+
 export function applyCombatDamage(state, actor, target, rawDamage, event) {
   if (!target.alive || rawDamage <= 0) return;
   const friendlyFire = actor.team === target.team;
@@ -67,12 +71,13 @@ export function resolveCombat(state, map) {
     const target = selectTarget(state, map, actor);
     if (actor.targetId !== (target?.id ?? null)) {
       actor.targetId = target?.id ?? null;
-      actor.readyTick = state.tick + Math.max(4, Math.ceil((600 - actor.intelligence * 4) / 50));
+      actor.readyTick = state.tick + reactionTicks(actor);
     }
     if (!target) continue;
     actor.facing = Math.atan2(target.y - actor.y, target.x - actor.x);
     if (state.tick < actor.readyTick || state.tick < actor.nextShotTick || actor.reloadUntilTick !== null || actor.ammo <= 0) continue;
-    const hit = randomUnit(state) < hitProbability(actor, target, state);
+    const chance = hitProbability(actor, target, state);
+    const hit = randomUnit(state) < chance;
     const distance = Math.hypot(target.x - actor.x, target.y - actor.y);
     const missOffset = hit ? 0 : (randomUnit(state) < 0.5 ? -1 : 1)
       * (Math.atan2(target.radius + 3, Math.max(distance, 1)) + 0.05);
@@ -81,7 +86,7 @@ export function resolveCombat(state, map) {
     const event = {
       type: 'shot', tick: state.tick, actorId: actor.id, targetId: target.id, weaponId: weapon.id,
       from: { x: actor.x, y: actor.y }, to: { x: actor.x + Math.cos(angle) * length, y: actor.y + Math.sin(angle) * length },
-      hit, damage: 0,
+      hit, damage: 0, chance, aim: actor.aim, fatiguePenalty: actor.fatiguePenalty ?? 0,
     };
     actor.ammo--;
     actor.nextShotTick = state.tick + weapon.intervalTicks;

@@ -6,7 +6,7 @@ import { getClubView } from '../src/game/world-selectors.js';
 import { RELAY_MAP } from '../src/data/maps/relay.js';
 import { TRAINING_RIFLE } from '../src/data/weapons.js';
 import { createPractice, advancePractice, stepPractice, visibleOpponents } from '../src/simulation/practice.js';
-import { hitProbability, resolveCombat } from '../src/simulation/combat.js';
+import { hitProbability, resolveCombat, selectTarget, reactionTicks } from '../src/simulation/combat.js';
 import { rayDistance, canOccupy } from '../src/simulation/geometry.js';
 
 const open = { columns: 20, rows: 10, tileSize: 40, walls: [] };
@@ -66,6 +66,30 @@ test('에임·거리·이동 상태가 명중 확률에 반영된다', () => {
   assert.ok(hitProbability({ ...home, aim: 99 }, away) > hitProbability({ ...home, aim: 1 }, away));
   assert.ok(hitProbability(home, away) > hitProbability(home, { ...away, x: 290 }));
   assert.ok(hitProbability(home, away) > hitProbability({ ...home, moving: true }, away));
+});
+
+test('시야와 무기 사거리는 독립적으로 사격 가능 여부를 제한한다', () => {
+  const { state, home, away } = duel();
+  Object.assign(home, { weaponId: 'sniper', viewRange: 220, fieldOfView: Math.PI });
+  away.x = home.x + 270;
+  assert.equal(selectTarget(state, open, home), null);
+  home.viewRange = 320;
+  assert.equal(selectTarget(state, open, home), away);
+  home.weaponId = 'basic-pistol';
+  assert.equal(selectTarget(state, open, home), null);
+  home.weaponId = 'sniper'; away.x = home.x + 310;
+  assert.equal(selectTarget(state, open, home), null);
+});
+
+test('사격 설명은 실제 명중 확률·적용 에임·피로 보정과 반응 시간을 기록한다', () => {
+  const { state, home, away } = duel();
+  home.aim = 20; home.fatiguePenalty = -5;
+  const chance = hitProbability(home, away, state);
+  resolveCombat(state, open);
+  const event = state.events.find(event => event.type === 'shot' && event.actorId === home.id);
+  assert.equal(event.chance, chance); assert.equal(event.aim, 20); assert.equal(event.fatiguePenalty, -5);
+  home.targetId = null; home.intelligence = 20; resolveCombat(state, open);
+  assert.equal(home.readyTick, state.tick + reactionTicks(home));
 });
 
 test('지능이 높은 선수는 표적 획득 후 더 빨리 반응한다', () => {

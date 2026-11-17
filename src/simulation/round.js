@@ -4,7 +4,7 @@ import { ROUND_RULES, ROUND_VISION } from '../config/round.js';
 import { prepareRoundMovement } from './round-movement.js';
 import { assignDefenseTasks } from './defense-tactics.js';
 import { assignAttackTasks } from './attack-tactics.js';
-import { setupManualRound, settleManualRound } from './manual-tactics.js';
+import { setupManualRound, settleManualRound, manualPlanFor } from './manual-tactics.js';
 
 export function setupRound(state, map, attackTeam, siteName) {
   const site = map.sites.find(item => item.name === siteName);
@@ -19,9 +19,13 @@ export function setupRound(state, map, attackTeam, siteName) {
       ROUND_VISION[attacking ? 'attack' : 'defense'],
       { facing: attacking ? 0 : Math.PI, objectiveKey: null, action: null, patrolMode: null, patrolStep: 0,
         trafficBlocked: false, crowdedGoal: null, navigationTick: null, yieldUntilTick: 0, yieldAngle: 0, keepingDistance: false,
-        smokeGuardKey: null, smokeGuardUntil: 0, smokeGuarding: false });
+        smokeGuardKey: null, smokeGuardUntil: 0, smokeGuarding: false, defenseSmoke: null, smokeWatching: false,
+        pendingSound: null, heardSound: null });
   }
   setupManualRound(state);
+  const designated = attackTeam === 'home' ? state.manualPlans.attack.carrierNumber : undefined;
+  const carrier = state.actors.find(actor => actor.team === attackTeam && actor.number === designated && actor.alive);
+  if (carrier) state.round.bomb.carrierId = carrier.id;
   assignDefenseTasks(state, map);
   assignAttackTasks(state, map);
   prepareRound(state, map);
@@ -42,11 +46,25 @@ export function prepareRound(state, map) {
   const round = state.round;
   const bomb = round.bomb;
   let site = map.sites.find(item => item.name === round.siteName);
+  let manualPlantCarrierId = null;
   if (bomb.status === 'carried') {
     const carrier = state.actors.find(actor => actor.id === bomb.carrierId);
     bomb.x = carrier.x; bomb.y = carrier.y;
+    if (carrier.alive && (manualPlanFor(state, carrier)
+      || carrier.team === 'home' && state.manualPlans?.attack?.carrierNumber === carrier.number)) {
+      const entered = map.sites.find(item => carrier.x >= item.x * map.tileSize && carrier.x < (item.x + item.width) * map.tileSize
+        && carrier.y >= item.y * map.tileSize && carrier.y < (item.y + item.height) * map.tileSize);
+      if (entered) {
+        manualPlantCarrierId = carrier.id;
+        if (round.siteName !== entered.name) {
+          round.siteName = entered.name;
+          assignAttackTasks(state, map);
+        }
+        site = entered;
+      }
+    }
   }
-  prepareRoundMovement(state, map, site);
+  prepareRoundMovement(state, map, site, manualPlantCarrierId);
   site = map.sites.find(item => item.name === round.siteName);
   let candidate = null;
   let type = null;
@@ -72,7 +90,7 @@ export function prepareRound(state, map) {
     const lastChance = timeLeft > remaining && timeLeft <= duration + 1;
     const hitAge = candidate.incomingFire ? state.tick - candidate.incomingFire.tick : Infinity;
     const recentlyHit = hitAge >= 0 && hitAge <= 20;
-    if (!lastChance && (recentlyHit || selectTarget(state, map, candidate))) candidate = null;
+    if ((candidate.id === manualPlantCarrierId || !lastChance) && (recentlyHit || selectTarget(state, map, candidate))) candidate = null;
   }
   if (!candidate) round.action = null;
   else {

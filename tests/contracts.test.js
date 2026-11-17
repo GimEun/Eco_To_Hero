@@ -69,7 +69,7 @@ test('v8은 재계약 조건·월급·명단·자금을 왕복하며 잘못된 �
   const world = sample(), id = world.clubs[0].playerIds[0];
   renewContract(world, id, 28);
   const saved = createSave(world);
-  assert.equal(saved.schemaVersion, 47);
+  assert.equal(saved.schemaVersion, 48);
   assert.deepEqual(restoreWorld(parseBackup(JSON.stringify(saved))), world);
   for (const change of [
     w => delete w.clubs[0].contracts,
@@ -108,7 +108,7 @@ test('v2/v3 복원은 계약만 추가하고 선수·구단 자금·주전·후�
       assert.deepEqual(Object.keys(contracts), club.playerIds);
       assert.ok(Object.values(contracts).every(c => c.durationDays === 84));
     }
-    assert.equal(createSave(restored).schemaVersion, 47);
+    assert.equal(createSave(restored).schemaVersion, 48);
   }
 });
 
