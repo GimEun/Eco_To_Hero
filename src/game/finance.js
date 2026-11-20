@@ -55,6 +55,24 @@ export function prepareDayFinance(world, club, actionIncome = 0, broadcasting = 
   };
 }
 
+export function nextSettlementForecast(club) {
+  const days = FINANCE_RULES.periodDays - (club.day - club.finance.weeklyStartedDay) % FINANCE_RULES.periodDays;
+  if (!Number.isSafeInteger(club.day + days)) return { ok: false, message: '게임 날짜 범위를 넘어 정산을 예상할 수 없습니다.' };
+  const projected = { ...club, finance: structuredClone(club.finance) };
+  let settlement;
+  for (let offset = 0; offset < days; offset++) {
+    const result = prepareDayFinance({ day: club.day + offset }, projected);
+    if (!result.ok) return result;
+    projected.balance = result.balance;
+    projected.finance = result.finance;
+    settlement = result.settlement;
+  }
+  const accrued = Math.floor(club.finance.accruedUnits / FINANCE_RULES.salaryUnitDivisor);
+  return { ok: true, day: club.day + days, days, balance: projected.balance, income: settlement.income,
+    cost: settlement.wagesDue, accrued, remainingCost: settlement.wagesDue - accrued,
+    expiring: Object.values(club.contracts).some(contract => contract.remainingDays <= days) };
+}
+
 export function validateFinance(finance, day, { legacyWeekly = false, legacySponsor = false, legacyCoach = false, legacyFacilities = false, legacyCash = false, facilities = null } = {}) {
   const safe = value => Number.isSafeInteger(value) && value >= 0;
   const fail = () => { throw new Error('구단 재정 정보가 올바르지 않습니다.'); };

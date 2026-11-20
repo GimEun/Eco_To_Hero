@@ -15,7 +15,8 @@ test('재정 요약은 모든 항목에 공통으로 남고 선택한 영역 하
     const overview = html.match(/<div class="finance-overview">([\s\S]*?)<div class="finance-section-body">/)[1];
     assert.match(overview, /구단 재정/);
     assert.match(overview, /운영 자금 \$15,000/);
-    assert.match(overview, /주간 총 비용/);
+    assert.match(overview, /정산 시 총 비용/);
+    assert.match(overview, /정산 후 예상 잔액/);
     assert.doesNotMatch(overview, /data-finance-section=/);
   }
   assert.deepEqual(world, before);

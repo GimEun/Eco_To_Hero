@@ -235,6 +235,17 @@ test('장비 구매 화면은 총기 6종·가격·방탄복과 환불 규칙을
   assert.match(shop, /자금 부족/);
   assert.doesNotMatch(players + shop, /away-/);
   assert.match(economyPanel(), /이전 라운드에서 가져온 무기는 환불하지 않습니다/);
+  const selected = state.actors.find(actor => actor.id === 'home-1');
+  selected.cash = 5000;
+  for (const armor of [100, 40, 1, 0]) {
+    selected.armor = armor;
+    const before = structuredClone(state);
+    renderEconomy(panel, state);
+    const button = entries.get('.equipment-shop').innerHTML.match(/<button[^>]*data-equipment="armor"[^>]*>/)[0];
+    assert.equal(button.includes('is-owned'), armor > 0, `armor ${armor}`);
+    assert.equal(button.includes('disabled'), armor === 100);
+    assert.deepEqual(state, before);
+  }
   startEconomyRound(state);
   renderEconomy(panel, state);
   assert.match(entries.get('.equipment-shop').innerHTML, /data-buy="home-1" data-equipment="armor" disabled/);

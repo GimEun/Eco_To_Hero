@@ -16,7 +16,7 @@ export function confirmClubReplacement({ currentClubName, savedClubName, nextClu
     <p id="club-replacement-description" class="club-replacement-notice" data-description="구단 교체와 저장">${loading
       ? '현재 창의 구단을 저장된 구단으로 교체합니다. 저장하지 않은 진행 내용은 사라집니다.'
       : canSave
-      ? '시작하면 기존 저장 슬롯을 새 구단으로 덮어씁니다. 보관할 구단은 취소 후 JSON 백업을 먼저 내려받아 주세요.'
+      ? '시작하면 기존 저장 슬롯을 새 구단으로 덮어씁니다. 보관할 구단은 취소 후 백업을 먼저 내려받아 주세요.'
       : '저장소를 읽지 못해 현재 창의 구단만 교체합니다. 기존 저장은 변경하지 않습니다.'}</p>
     <div class="club-replacement-actions"><button class="button secondary" value="cancel" autofocus>취소 · ${loading ? '현재' : '기존'} 구단 유지</button><button class="button primary" value="replace">${loading ? '저장된 구단 이어하기' : '새 구단으로 시작'} →</button></div>
   </form>`;

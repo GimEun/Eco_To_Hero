@@ -6,7 +6,7 @@ import { runYearAdvance } from './game/run-year-advance.js';
 import { showYearAdvanceProgress } from './ui/year-advance-panel.js';
 import { GAME } from './config/game.js';
 import { createClub } from './game/create-club.js';
-import { menuScreen, newGameScreen, createClubScreen, clubScreen } from './ui/screens.js';
+import { menuScreen, newGameScreen, createClubScreen, clubScreen, gameBanner } from './ui/screens.js';
 import { createSave, validateSave, restoreWorld, parseBackup, serializeBackup, MAX_BACKUP_BYTES, SCHEMA_VERSION } from './storage/save-data.js';
 import { recruitPlayer, releasePlayer, replaceStarter } from './game/roster.js';
 import { renewContract } from './game/contracts.js';
@@ -40,6 +40,9 @@ import { changeCoach } from './game/coaches.js';
 import { upgradeFacility } from './game/facilities.js';
 import { clubTabForFocus } from './ui/club-tabs.js';
 import { mountFinanceSections } from './ui/finance-panel.js';
+import { mountScheduleCalendar } from './ui/schedule-calendar-panel.js';
+import { updateActionPreviews } from './ui/training-panel.js';
+import { seasonYearStart } from './game/season-year-context.js';
 import { bankruptcyIssue } from './game/bankruptcy.js';
 import { changeLoan } from './game/loans.js';
 import { tradeStock } from './game/stocks.js';
@@ -199,7 +202,7 @@ app.innerHTML = `
   <a class="skip-link" href="#main-content">본문으로 건너뛰기</a>
   <div class="app-shell">
     <aside class="sidebar">
-      <div class="sidebar-identity"><button class="brand-mark" data-action="menu" aria-label="ETH 메인 메뉴">ETH</button><span>구단 운영실</span></div>
+      <div class="sidebar-identity"><button type="button" class="brand-mark" data-action="menu" aria-label="메인 메뉴로 이동"><img src="${gameBanner}" width="1774" height="887" alt="ECO TO HERO" /></button></div>
       <div class="sidebar-section">구단 관리</div>
       <nav aria-label="주 메뉴">
         <button class="nav-button" data-action="menu"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg><span>메인 메뉴</span></button>
@@ -211,9 +214,9 @@ app.innerHTML = `
       </nav>
       <div class="sidebar-bottom"><span class="status-dot" aria-hidden="true"></span>싱글플레이<small>경영 · 육성 · 전술</small></div>
     </aside>
-    <div class="workspace"><header class="topbar"><div><span class="brand-title"></span><span class="brand-subtitle"></span></div><span class="build-label">구단 경영 <span>v0.1</span></span></header><main id="main-content" tabindex="-1"></main><footer class="footer"><span data-description="저장 방식">이 브라우저에 저장 · JSON 백업 지원</span></footer></div>
+    <div class="workspace"><header class="topbar"><div><span class="brand-title"></span><span class="brand-subtitle"></span></div><span class="build-label">구단 경영 <span>v0.1</span></span></header><main id="main-content" tabindex="-1"></main><footer class="footer"><span data-description="저장 방식">이 브라우저에 저장 · 백업 지원</span></footer></div>
   </div>
-  <input id="backup-file" type="file" accept=".json,application/json" hidden aria-label="JSON 백업 파일 선택" />
+  <input id="backup-file" type="file" accept=".json,application/json" hidden aria-label="백업 파일 선택" />
 `;
 app.querySelector('.brand-title').textContent = GAME.title;
 app.querySelector('.brand-subtitle').textContent = GAME.subtitle;
@@ -302,6 +305,7 @@ function render(screenName, focusSelector = null) {
     }
   }
   if (screenName === 'club' && club && !bankruptcyIssue(world)) mountFinanceSections(screen, id => { selectedFinanceSection = id; });
+  if (screenName === 'club' && club && !bankruptcyIssue(world)) mountScheduleCalendar(screen, world);
   if (screenName === 'practice') disposePractice = mountPractice(screen, world, { onStrategySave: saveStrategyLibrary, onTrainingReward: message => {
     isSaved = false;
     if (activeYearAdvance(world)) void runOperation(async () => {
@@ -378,7 +382,7 @@ async function applyCandidate(nextWorld) {
   draftLogoId = CLUB_LOGOS[0].id;
   render('club');
   notify(saveError
-    ? `${saveError.message} 현재 구단은 이 창에만 유지됩니다. 새로고침 전에 JSON 백업을 내려받아 주세요.`
+    ? `${saveError.message} 현재 구단은 이 창에만 유지됩니다. 새로고침 전에 백업을 내려받아 주세요.`
     : `「${nextClub.name}」 구단과 58팀·600명의 세계를 이 브라우저에 저장했습니다.`, Boolean(saveError));
 }
 
@@ -446,7 +450,7 @@ function exportBackup() {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  notify('JSON 백업 다운로드를 요청했습니다. 브라우저의 다운로드 목록을 확인해 주세요.');
+  notify('백업 다운로드를 요청했습니다. 브라우저의 다운로드 목록을 확인해 주세요.');
 }
 
 function progressWeeklySchedule(teamTraining, prefix = '') {
@@ -508,6 +512,7 @@ app.addEventListener('click', (event) => {
     dialog.querySelector('#training-title').textContent = '연말까지 반복할 선수 행동 선택';
     dialog.querySelector('[data-description="선수 행동 선택"]').textContent = '선택한 행동을 연말까지 반복합니다. 연속 행동 불이익도 적용합니다. 이벤트·팀 연습·계약 문제에서 멈추며, 해결 후 직접 계속 진행하세요. 매주 자동 저장하고 목표일에서 멈춥니다.';
     dialog.querySelector('[data-action="confirm-week"]').textContent = '선택 완료 · 연말까지 진행 ▶';
+    updateActionPreviews(dialog, getClubView(world), seasonYearStart(world) + 364 - world.day);
     dialog.showModal();
     return;
   }
@@ -798,6 +803,7 @@ app.addEventListener('change', (event) => {
     }
     const teamTraining = choices.some(select => select.value === 'team' && club.lineupIds.includes(select.dataset.weekActionPlayer));
     dialog.querySelector('[data-action="confirm-week"]').textContent = weeklyActionPurpose === 'year' ? '선택 완료 · 연말까지 진행 ▶' : teamTraining ? '선택 완료 · 팀 훈련 진행 ▶' : `선택 완료 · ${club.weekDaysRemaining ? `남은 ${club.weekDaysRemaining}일` : '1주'} 진행 ▶`;
+    updateActionPreviews(dialog, club, weeklyActionPurpose === 'year' ? seasonYearStart(world) + 364 - world.day : undefined);
     return;
   }
   if (event.target.dataset.lineupPlayer) {

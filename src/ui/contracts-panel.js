@@ -17,6 +17,6 @@ export function contractsPanel(club) {
           <button class="button secondary" data-action="renew-contract" data-player-id="${escapeHtml(player.id)}">재계약</button></div></td></tr>`;
       }).join('')}
     </tbody></table></div>
-    <p class="roster-footnote" data-description="주급과 계약 저장">주급은 영입 계약금의 10%를 $10 단위로 반올림한 금액의 1/4입니다. 재계약 후 구단 저장 또는 JSON 백업으로 보관하세요.</p>
+    <p class="roster-footnote" data-description="주급과 계약 저장">주급은 영입 계약금의 10%를 $10 단위로 반올림한 금액의 1/4입니다. 재계약 후 구단 저장 또는 백업으로 보관하세요.</p>
   </section>`;
 }

@@ -98,3 +98,18 @@ export function trainPlayers(world, playerIds) {
   }
   return growth;
 }
+
+export function previewPlayerAction(club, player, action, days = club.weekDaysRemaining || ACTION_RULES.weekDays) {
+  if (!Object.hasOwn(TRAINING_LABELS, action) || !Number.isInteger(days) || days < 1 || days > 364
+    || !Number.isSafeInteger(club.day + days)) throw new Error('행동 예상 기간 또는 행동이 올바르지 않습니다.');
+  const projected = structuredClone(player);
+  projected.training.schedule.fill(action);
+  const preview = { clubs: [club], playerClubId: club.id, players: [projected], day: club.day };
+  // 날짜 진행·이벤트·난수 없이 실제 일일 성장과 상태 계산만 재사용한다.
+  for (let day = 0; day < days; day++, preview.day++) trainPlayers(preview, [player.id]);
+  return { player: projected, days, skills: TRAINING_SKILLS.map(skill => ({ skill,
+    stat: projected[skill] - player[skill],
+    experience: (projected[skill] - player[skill]) * TRAINING_RULES.levelExperience
+      + projected.training.experience[skill] - player.training.experience[skill],
+  })), happiness: projected.morale.happiness - player.morale.happiness, fatigue: projected.fatigue - player.fatigue };
+}

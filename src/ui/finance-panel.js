@@ -1,6 +1,6 @@
 import { FINANCE_RULES } from '../config/finance.js';
 import { mountTabs } from './club-tabs.js';
-import { sponsorIncome } from '../game/sponsors.js';
+import { nextSettlementForecast } from '../game/finance.js';
 import { sponsorsPanel, sponsorReceipt } from './sponsors-panel.js';
 import { coachRule } from '../game/coaches.js';
 import { facilityMaintenance } from '../game/facilities.js';
@@ -18,30 +18,26 @@ export function financePanel(club, selectedSection = 'sponsors') {
   const active = sections.some(([id]) => id === selectedSection) ? selectedSection : 'sponsors';
   const section = (id, markup) => `<div id="finance-section-${id}" class="finance-section" role="tabpanel" aria-labelledby="finance-tab-${id}" data-finance-section="${id}"${id === active ? '' : ' hidden'}>${markup}</div>`;
   const finance = club.finance;
-  const elapsed = club.day - finance.weeklyStartedDay;
-  const daysLeft = FINANCE_RULES.periodDays - elapsed % FINANCE_RULES.periodDays;
-  const monthlySalary = Object.values(club.contracts).reduce((sum, contract) => sum + contract.monthlySalary, 0);
-  const coachSalary = coachRule(club.coach)?.weeklySalary ?? 0;
-  const maintenance = facilityMaintenance(club.facilities);
-  const interest = weeklyInterest(finance.loan);
-  const sponsor = finance.sponsor;
+  const forecast = nextSettlementForecast(club);
   return `<section class="panel finance-panel" aria-labelledby="finance-title">
     <div class="finance-overview">
     <div class="roster-heading"><h2 id="finance-title" tabindex="-1">구단 재정</h2><span class="tag muted-tag">게임 ${Math.floor((club.day - 1) / 7) + 1}주 차</span></div>
     <div class="world-summary"><span class="tag">운영 자금 ${money(club.balance)}</span><span class="tag muted-tag">누적 비용 ${money(finance.accruedUnits / FINANCE_RULES.salaryUnitDivisor)}</span><span class="tag muted-tag">대출 원금 ${money(finance.loan.principal)}</span></div>
-    <div class="finance-settlement-summary" aria-label="다음 정산 예상 수입과 주간 비용">
+    ${forecast.ok ? `<div class="finance-settlement-summary" aria-label="다음 정산까지의 예상 수입과 비용">
       <dl class="finance-summary-main">
-        <div><dt>다음 정산</dt><dd>${Math.floor((club.day + daysLeft - 1) / 7) + 1}주 차 <small>${Math.ceil(daysLeft / 7)}주 이내</small></dd></div>
-        <div class="finance-summary-income"><dt>스폰서 수입 <small>현재 실적 기준</small></dt><dd>${money(sponsorIncome(sponsor))}</dd></div>
-        <div class="finance-summary-total"><dt>주간 총 비용</dt><dd>${money(monthlySalary / 4 + coachSalary + maintenance + interest)}</dd></div>
+        <div><dt>다음 정산</dt><dd>${Math.floor((forecast.day - 1) / 7) + 1}주 차 <small>${forecast.days}일 후</small></dd></div>
+        <div class="finance-summary-income"><dt>스폰서 수입 <small>현재 실적 기준</small></dt><dd>${money(forecast.income)}</dd></div>
+        <div class="finance-summary-total"><dt>정산 시 총 비용</dt><dd>${money(forecast.cost)}</dd></div>
       </dl>
-      <dl class="finance-summary-costs" aria-label="주간 비용 내역">
-        <div><dt>현재 명단 주급 합계</dt><dd>${money(monthlySalary / 4)}</dd></div>
-        <div><dt>코치 주급</dt><dd>${money(coachSalary)}</dd></div>
-        <div><dt>시설 유지비</dt><dd>${money(maintenance)}</dd></div>
-        <div><dt>대출 이자</dt><dd>${money(interest)}</dd></div>
+      <dl class="finance-summary-costs" aria-label="현재부터 다음 정산까지의 자금 흐름">
+        <div><dt>현재 자금</dt><dd>${money(club.balance)}</dd></div>
+        <div><dt>이미 누적된 비용</dt><dd>${money(forecast.accrued)}</dd></div>
+        <div><dt>앞으로 ${forecast.days}일 비용</dt><dd>${money(forecast.remainingCost)}</dd></div>
+        <div><dt>정산 후 예상 잔액</dt><dd>${money(forecast.balance)}</dd></div>
       </dl>
-    </div>
+      <p class="input-hint finance-forecast-note">현재 자금 + 스폰서 수입 − 정산 시 총 비용 = 예상 잔액. 현재 명단·급여·코치·시설·대출이 유지된다고 가정하며 비용의 소수 이월분을 반영합니다. 미래 방송 수입·경기 보상·스폰서 추가 실적·주식 변동·이벤트는 제외합니다.${forecast.expiring ? ' 정산 전에 만료될 계약이 있어 갱신·명단 변경 후 예상치가 달라질 수 있습니다.' : ''}</p>
+      <details class="finance-forecast-note"><summary>현재 비용 요율 · 주당 참고 금액</summary><p class="input-hint">현재 명단 주급 합계 ${money(Object.values(club.contracts).reduce((sum, contract) => sum + contract.monthlySalary, 0) / 4)} · 코치 주급 ${money(coachRule(club.coach)?.weeklySalary ?? 0)} · 시설 유지비 ${money(facilityMaintenance(club.facilities))} · 대출 이자 ${money(weeklyInterest(finance.loan))}<br>요율 확인용이며, 이번 정산의 실제 기간·누적분은 위 총 비용에 반영합니다.</p></details>
+    </div>` : `<p class="field-error">${forecast.message}</p>`}
     </div>
     <div class="finance-section-tabs" role="tablist" aria-label="재정 항목">${sections.map(([id, label]) => `<button type="button" class="button secondary" role="tab" id="finance-tab-${id}" data-finance-tab="${id}" aria-controls="finance-section-${id}" aria-selected="${id === active}" tabindex="${id === active ? 0 : -1}">${label}</button>`).join('')}</div>
     <div class="finance-section-body">

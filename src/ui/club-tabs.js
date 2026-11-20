@@ -5,6 +5,7 @@ export const CLUB_TABS = Object.freeze([
   { id: 'finance', label: '재정·스폰서', heading: '#finance-title' },
   { id: 'coaches', label: '코치', heading: '#coaches-title' },
   { id: 'facilities', label: '시설', heading: '#facilities-title' },
+  { id: 'calendar', label: '달력', heading: '#schedule-calendar-title' },
   { id: 'events', label: '이벤트', heading: '#player-events-title' },
 ]);
 export function clubTabForFocus(selector, current = 'roster') {

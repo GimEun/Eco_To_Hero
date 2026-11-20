@@ -150,6 +150,7 @@ test('재정 화면은 정산 주차·주급·수입·실제 지급 내역을 �
   assert.match(empty, /다음 정산 2주 차/); assert.match(empty, /아직 정산 내역이 없습니다/);
   days(world, 7); const before = structuredClone(world), markup = financePanel(getClubView(world)).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
   assert.match(markup, /다음 정산 3주 차/); assert.match(markup, /스폰서 수입 현재 실적 기준 \$1,250/);
-  assert.match(markup, /주급 합계/); assert.match(markup, /미지급분 지급/); assert.match(markup, /정산 후 자금/);
-  assert.doesNotMatch(markup, /일 차|일 후|30일|월급/); assert.deepEqual(world, before);
+  assert.match(markup, /이미 누적된 비용/); assert.match(markup, /앞으로 7일 비용/);
+  assert.match(markup, /정산 후 예상 잔액/); assert.match(markup, /미지급분 지급/); assert.match(markup, /정산 후 자금/);
+  assert.doesNotMatch(markup, /30일|월급/); assert.deepEqual(world, before);
 });

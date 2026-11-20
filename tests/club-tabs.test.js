@@ -37,9 +37,9 @@ function fixture(t, options = {}) {
   return { world, screen, buttons, panels, changes, listeners };
 }
 
-test('구단 관리 7개 탭 중 선택한 영역 하나만 표시하고 공통 진행/저장을 유지한다',t=>{
+test('달력을 포함한 구단 관리 8개 탭 중 선택한 영역 하나만 표시하고 공통 진행/저장을 유지한다',t=>{
   const f=fixture(t,{activeTab:'facilities'});
-  assert.equal(f.buttons.length,7); assert.equal(f.panels.length,7);
+  assert.equal(f.buttons.length,8); assert.equal(f.panels.length,8);
   assert.deepEqual(f.panels.filter(panel=>!panel.hidden).map(panel=>panel.dataset.clubPanel),['facilities']);
   assert.match(f.screen.innerHTML,/data-action="advance-week"/); assert.match(f.screen.innerHTML,/data-action="save"/);
   assert.doesNotMatch(f.screen.innerHTML,/class="stat-grid"/);

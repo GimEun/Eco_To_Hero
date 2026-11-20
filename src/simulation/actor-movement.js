@@ -1,4 +1,4 @@
-import { moveWithCollision, findPath, canSee, cellCenter } from './geometry.js';
+import { moveWithCollision, findPath, canSee, cellCenter, rayDistance } from './geometry.js';
 import { THROWABLES } from '../data/throwables.js';
 import { ROUND_RULES } from '../config/round.js';
 import { manualPlanFor } from './manual-tactics.js';
@@ -35,15 +35,52 @@ function clearOfPlayers(actor, next, actors) {
 
 function moveAroundPlayers(map, actor, target, travel, actors, tick) {
   const angle = Math.atan2(target.y - actor.y, target.x - actor.x);
+  const direct = moveWithCollision(map, actor, { x: actor.x + Math.cos(angle) * travel, y: actor.y + Math.sin(angle) * travel });
+  const goal = actor.route.at(-1);
+  const following = target === actor.route[actor.waypoint] && actors.some(other => {
+    const next = other.route?.[other.waypoint], otherGoal = other.route?.at(-1);
+    return other.id !== actor.id && other.alive && other.team === actor.team && next && otherGoal && !other.arrived
+      && movementSpeed(other) > 0 && Math.hypot(goal.x - otherGoal.x, goal.y - otherGoal.y) < 1e-7
+      && (other.x - actor.x) * Math.cos(angle) + (other.y - actor.y) * Math.sin(angle) > 0
+      && Math.cos(Math.atan2(next.y - other.y, next.x - other.x) - angle) > 0.8
+      && !clearOfPlayers(actor, direct, [other]);
+  });
+  if (following) { actor.yieldUntilTick = 0; return { x: actor.x, y: actor.y }; }
+  // 몸체가 점유한 목표는 국소 회피로 도달할 수 없으므로 주변을 맴돌지 않는다.
+  if (target === actor.route.at(-1) && actors.some(other => other.id !== actor.id && other.alive
+    && (other.arrived || other.action || other.speed <= 0)
+    && Math.hypot(target.x - other.x, target.y - other.y) < actor.radius + other.radius
+    && Math.hypot(actor.x - other.x, actor.y - other.y) <= actor.radius + other.radius + travel)) {
+    actor.yieldUntilTick = 0;
+    return { x: actor.x, y: actor.y };
+  }
+  const blocker = actors.find(other => {
+    const next = other.route?.[other.waypoint];
+    return other.id !== actor.id && other.alive && !clearOfPlayers(actor, direct, [other])
+      && (other.arrived || other.action || other.speed <= 0 || other.entryWaiting || other.smokeGuarding || other.smokeWatching
+        || other.targetId && !other.retreating || next && Math.cos(Math.atan2(next.y - other.y, next.x - other.x) - angle) < -0.8);
+  });
+  if (blocker) {
+    const span = actor.radius + blocker.radius;
+    const width = rayDistance(map, actor, angle + Math.PI / 2, span * 2)
+      + rayDistance(map, actor, angle - Math.PI / 2, span * 2);
+    if (width <= span * 2 + 2) {
+      const detour = findPath(map, { x: Math.floor(actor.x / map.tileSize), y: Math.floor(actor.y / map.tileSize) },
+        { x: Math.floor(goal.x / map.tileSize), y: Math.floor(goal.y / map.tileSize) }, actor.radius, [blocker]);
+      if (!detour.length) { actor.yieldUntilTick = 0; return { x: actor.x, y: actor.y }; }
+    }
+  }
   if (actor.yieldUntilTick > tick) {
-    const yielding = moveWithCollision(map, actor, { x: actor.x + Math.cos(actor.yieldAngle) * travel,
+    const next = moveWithCollision(map, actor, { x: actor.x + Math.cos(actor.yieldAngle) * travel,
       y: actor.y + Math.sin(actor.yieldAngle) * travel });
-    if (Math.hypot(yielding.x - actor.x, yielding.y - actor.y) > 1e-7 && clearOfPlayers(actor, yielding, actors)) return yielding;
+    if (Math.hypot(next.x - actor.x, next.y - actor.y) > 1e-7 && clearOfPlayers(actor, next, actors)) return next;
     actor.yieldUntilTick = 0;
   }
-  // 같은 회전 방향을 우선해 마주 오는 선수들이 서로 다른 쪽으로 비킨다.
-  for (const turn of [0, Math.PI / 6, -Math.PI / 6, Math.PI / 3, -Math.PI / 3, Math.PI / 2, -Math.PI / 2,
-    Math.PI * 2 / 3, -Math.PI * 2 / 3, Math.PI * 5 / 6, -Math.PI * 5 / 6, Math.PI]) {
+  if (Math.hypot(direct.x - actor.x, direct.y - actor.y) > 1e-7 && clearOfPlayers(actor, direct, actors)) return direct;
+  // 통과할 폭이 있으면 기존 우회로를 사용한다.
+  const turns = [Math.PI / 6, -Math.PI / 6, Math.PI / 3, -Math.PI / 3, Math.PI / 2, -Math.PI / 2,
+    Math.PI * 2 / 3, -Math.PI * 2 / 3, Math.PI * 5 / 6, -Math.PI * 5 / 6, Math.PI];
+  for (const turn of turns) {
     const next = moveWithCollision(map, actor, { x: actor.x + Math.cos(angle + turn) * travel,
       y: actor.y + Math.sin(angle + turn) * travel });
     if (Math.hypot(next.x - actor.x, next.y - actor.y) > 1e-7 && clearOfPlayers(actor, next, actors)) {
@@ -82,6 +119,19 @@ function occupiedArrival(state, map, actor, target) {
     return true;
   }
   if (manual) return false;
+  const final = actor.route.at(-1);
+  const finalCritical = state.round && (actor.id === state.round.defuserId || actor.id === state.round.recovererId || actor.id === bomb.carrierId);
+  // 재탐색의 중간점이 남아도 이미 공통 최종 목표 옆이면 도착한 아군을 돌아가지 않는다.
+  if (!last && !finalCritical && state.actors.some(other => other.id !== actor.id && other.alive
+    && other.team === actor.team && other.arrived && Math.hypot(other.route.at(-1).x - final.x, other.route.at(-1).y - final.y) < 1e-7
+    && Math.hypot(other.x - final.x, other.y - final.y) <= other.radius
+    && Math.hypot(actor.x - final.x, actor.y - final.y) <= actor.radius + other.radius + 4)) {
+    const clear = moveWithCollision(map, actor, final);
+    if (Math.hypot(clear.x - final.x, clear.y - final.y) < 1e-7) {
+      actor.crowdedGoal = { ...final }; actor.waypoint = actor.route.length; actor.arrived = true;
+      return true;
+    }
+  }
   const occupied = state.actors.some(other => other.id !== actor.id && other.alive
     && Math.hypot(other.x - target.x, other.y - target.y) <= other.radius
     && Math.hypot(actor.x - target.x, actor.y - target.y) <= actor.radius + other.radius + 4);

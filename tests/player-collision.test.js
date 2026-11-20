@@ -64,6 +64,87 @@ test('좁은 길에서 정지 선수를 밀거나 벽을 뚫지 않고 사망 �
   assert.equal(follower.arrived, true);
 });
 
+test('양 팀은 좁은 길의 정지 선수 뒤에서 반복 회전 없이 기다리고 길이 열리면 재출발한다', () => {
+  for (const team of ['home', 'away']) {
+    const front = actor(`${team}-1`, 200, 60, { x: 350, y: 60 }, { speed: 0, arrived: true });
+    const follower = actor(`${team}-2`, 100, 60, { x: 350, y: 60 });
+    const state = { tick: 0, actors: [front, follower] };
+    let lateTravel = 0;
+    for (let step = 0; step < 200; step++) {
+      const before = { x: follower.x, y: follower.y };
+      tick(state, narrowMap);
+      if (step >= 100) lateTravel += Math.hypot(follower.x - before.x, follower.y - before.y);
+    }
+    assert.ok(lateTravel < 1, `${team}: repeated detour distance ${lateTravel}`);
+    assert.equal(follower.trafficBlocked, true);
+    front.alive = false;
+    for (let step = 0; step < 200 && !follower.arrived; step++) tick(state, narrowMap);
+    assert.equal(follower.arrived, true);
+  }
+});
+
+test('몸체가 점유한 필수 목표 주변에서는 돌지 않고 기다린 뒤 목표가 비면 도착한다', () => {
+  for (const team of ['home', 'away']) {
+    const blocker = actor(`${team}-1`, 260, 160, { x: 260, y: 160 }, { speed: 0, arrived: true });
+    const mover = actor(`${team}-2`, 100, 160, { x: 260, y: 160 });
+    const state = { tick: 0, actors: [blocker, mover], round: { bomb: { status: 'planted' }, defuserId: mover.id } };
+    let lateTravel = 0;
+    for (let step = 0; step < 200; step++) {
+      const before = { x: mover.x, y: mover.y };
+      tick(state, openMap);
+      if (step >= 100) lateTravel += Math.hypot(mover.x - before.x, mover.y - before.y);
+    }
+    assert.ok(lateTravel < 1, `${team}: target orbit distance ${lateTravel}`);
+    assert.equal(mover.arrived, false);
+    blocker.alive = false;
+    for (let step = 0; step < 100 && !mover.arrived; step++) tick(state, openMap);
+    assert.equal(mover.arrived, true);
+  }
+});
+
+test('서로 비켜설 폭이 없는 통로에서 마주친 양 팀은 회전하지 않고 통로 개방을 기다린다', () => {
+  const state = { tick: 0, actors: [actor('home-1', 100, 60, { x: 340, y: 60 }), actor('away-1', 340, 60, { x: 100, y: 60 })] };
+  let lateTravel = 0;
+  for (let step = 0; step < 200; step++) {
+    const old = state.actors.map(actor => ({ x: actor.x, y: actor.y }));
+    tick(state, narrowMap);
+    if (step >= 100) lateTravel += state.actors.reduce((sum, actor, index) => sum + Math.hypot(actor.x - old[index].x, actor.y - old[index].y), 0);
+  }
+  assert.ok(lateTravel < 1, `head-on orbit distance ${lateTravel}`);
+  state.actors[1].alive = false;
+  for (let step = 0; step < 150 && !state.actors[0].arrived; step++) tick(state, narrowMap);
+  assert.equal(state.actors[0].arrived, true);
+});
+
+test('양 팀의 같은 동선에서는 빠른 후속 선수가 느린 선수를 따라가며 좌우로 돌지 않는다', () => {
+  for (const team of ['home', 'away']) {
+    const goal = { x: 420, y: 60 };
+    const front = actor(`${team}-1`, 180, 60, goal, { speed: 40 });
+    const follower = actor(`${team}-2`, 100, 60, goal, { speed: 92 });
+    const state = { tick: 0, actors: [front, follower] };
+    for (let step = 0; step < 90; step++) {
+      tick(state, narrowMap);
+      assert.equal(follower.y, 60);
+      assert.ok(follower.x < front.x);
+    }
+    assert.ok(follower.x > 200);
+    for (let step = 0; step < 180 && !state.actors.every(actor => actor.arrived); step++) tick(state, narrowMap);
+    assert.ok(state.actors.every(actor => actor.arrived));
+  }
+});
+
+test('앞선 아군과 목표가 같아도 수류탄 회피를 뒤따르기 대기로 막지 않는다', () => {
+  const goal = { x: 400, y: 160 };
+  const mover = actor('home-1', 100, 160, goal, { intelligence: 50, viewRange: 300, fieldOfView: Math.PI * 2 });
+  const front = actor('home-2', 122, 160, goal, { viewRange: 0 });
+  const state = { tick: 6, actors: [mover, front], projectiles: [{ kind: 'grenade', actorId: 'away-1',
+    from: { x: 90, y: 160 }, to: { x: 90, y: 160 }, throwTick: 0, detonateTick: 20 }] };
+  moveActors(state, openMap, new Set([front.id]), 50);
+  assert.ok(Math.hypot(mover.x - 90, mover.y - 160) > 10);
+  assert.equal(mover.grenadeEvades, 1);
+  assertClear(openMap, state.actors);
+});
+
 test('큰 이동량도 이동 구간 전체에서 몸체 충돌을 검사해 선수를 관통하지 않는다', () => {
   const state = { tick: 0, actors: [actor('home-1', 100, 60, { x: 350, y: 60 }, { speed: 4000 }),
     actor('away-1', 200, 60, { x: 200, y: 60 }, { speed: 0, arrived: true })] };

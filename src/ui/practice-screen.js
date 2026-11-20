@@ -39,7 +39,7 @@ export function practiceScreen() {
     <p class="input-hint" data-description="팀 훈련 보상">주간 팀 훈련 보상은 종료 시 한 번 지급합니다. 기본 경험치: 이동 10·교전 25·폭탄 40·구매 50·MR12 120. 승패·개인 KDA로 보정하며 MR12는 전체 경기 종료에 지급합니다. 일반 관전 반복에는 보상이 없습니다. 결과는 구단 통산 전적에 반영하지 않습니다.</p></details>
     ${matchPanel()}
     <p class="practice-teams"></p>
-    <div class="practice-controls practice-panel-toolbar"><button type="button" class="button secondary" data-strategy="manual" aria-expanded="false" aria-controls="manual-strategy-panel">수동 전략</button><button type="button" class="button secondary" data-strategy="automatic" aria-expanded="false" aria-controls="automatic-strategy-panel">자동 전략</button><button type="button" class="button secondary" data-strategy="purchase" aria-expanded="false" aria-controls="purchase-panel">장비 구매</button><button type="button" class="button secondary" data-strategy="content" aria-expanded="false" aria-controls="match-content-panel">경기 내용</button><span class="timeout-status input-hint" role="status"></span><button type="button" class="button primary" data-action="next-playoff-map" hidden>BO3 다음 맵 →</button></div>
+    <div class="practice-controls practice-panel-toolbar"><button type="button" class="button secondary" data-strategy="manual" aria-expanded="false" aria-controls="manual-strategy-panel">수동 전략</button><button type="button" class="button secondary" data-strategy="automatic" aria-expanded="false" aria-controls="automatic-strategy-panel">자동 전략</button><button type="button" class="button secondary" data-strategy="purchase" aria-expanded="false" aria-controls="purchase-panel">장비 구매</button><button type="button" class="button secondary" data-strategy="content" aria-expanded="false" aria-controls="match-content-dialog" aria-haspopup="dialog" aria-keyshortcuts="Tab">경기 내용</button><span class="timeout-status input-hint" role="status"></span><button type="button" class="button primary" data-action="next-playoff-map" hidden>BO3 다음 맵 →</button></div>
     <div class="practice-workspace"><div class="practice-layout"><div class="panel practice-map-wrap"><div class="practice-map-heading"><span>플레이 화면</span><p class="round-status" role="status" aria-live="off"></p><button type="button" class="button secondary" data-practice="expand-map" aria-pressed="false">화면 크게 ↗</button></div><div class="practice-map-stage"><canvas class="practice-canvas" width="960" height="640" aria-label="중계소 2D 지도. 선수 선택 목록에서 시야를 확인할 선수를 선택할 수 있습니다.">브라우저에서 Canvas를 지원해야 지도를 표시할 수 있습니다.</canvas></div><div class="map-legend" aria-label="지도 범례"><strong>지도 범례</strong><span><i class="home-dot"></i>내 팀</span><span><i class="away-dot"></i>상대 팀</span><span>금색 외곽: 감지한 상대</span><span>금색 점선 원: 무기 최대 사거리 · 시야/벽 판정 별도</span><span>선: 발사 궤적 · X: 사망 위치</span></div></div>
     <details class="panel practice-details"><summary>선수 정보·시야</summary><label for="practice-player">시야를 확인할 선수</label><select id="practice-player"></select><div class="practice-readout" aria-live="off"></div><div class="practice-detection" role="status" aria-live="polite"></div><p class="input-hint" data-description="선수 선택과 지도 표시">지도나 목록으로 선수를 선택하세요. 점선은 이동 경로, 작은 사각형은 목적지, 큰 점선 사각형은 수비 담당 구역입니다. 금색 ◆는 폭탄입니다.</p></details></div>
     <div class="strategy-options">
@@ -60,8 +60,10 @@ export function practiceScreen() {
     ${siteAllocationPanel()}
       </section>
       <div id="purchase-panel" class="purchase-panel" hidden>${economyPanel()}</div>
-      <div id="match-content-panel" class="combat-records" hidden><section class="panel combat-stat-panel"><div class="roster-heading"><h2>연습 기록</h2><span class="combat-survivors tag muted-tag"></span></div><details class="combat-help" data-description="경기 통계 기준"><summary>통계 기준</summary><p class="input-hint combat-metrics-note">명중률 = 명중 / 발사. ADR = MR12 완료 라운드의 총 피해 / 완료 라운드 수이며 라운드 종료 때 갱신합니다. 발사·완료 라운드가 없거나 ADR 대상이 아닌 모드는 —로 표시합니다.</p></details><div class="table-scroll" role="region" aria-label="경기 선수 통계" tabindex="0"><table class="combat-table"><thead><tr><th scope="col">선수</th><th scope="col">HP</th><th scope="col">탄약</th><th scope="col">K/D/A</th><th scope="col">피해</th><th scope="col">발사</th><th scope="col">명중</th><th scope="col">명중률</th><th scope="col">ADR</th></tr></thead><tbody></tbody></table></div></section><section class="panel combat-feed"><div class="roster-heading"><h2>최근 교전 이벤트</h2></div><ol class="combat-events" aria-label="최근 교전 이벤트"></ol></section>${highlightsPanel()}</div>
     </div></div></div>
+    <dialog id="match-content-dialog" class="match-content-dialog" aria-labelledby="match-content-title"><header class="match-content-heading"><h2 id="match-content-title">경기 내용</h2><button type="button" class="button secondary" data-practice="close-content">닫기 · Tab / Esc</button></header>
+      <div id="match-content-panel" class="combat-records" hidden><section class="panel combat-stat-panel"><div class="roster-heading"><h2>연습 기록</h2><span class="combat-survivors tag muted-tag"></span></div><details class="combat-help" data-description="경기 통계 기준"><summary>통계 기준</summary><p class="input-hint combat-metrics-note">명중률 = 명중 / 발사. ADR = MR12 완료 라운드의 총 피해 / 완료 라운드 수이며 라운드 종료 때 갱신합니다. 발사·완료 라운드가 없거나 ADR 대상이 아닌 모드는 —로 표시합니다.</p></details><div class="table-scroll" role="region" aria-label="경기 선수 통계" tabindex="0"><table class="combat-table"><thead><tr><th scope="col">선수</th><th scope="col">HP</th><th scope="col">탄약</th><th scope="col">K/D/A</th><th scope="col">피해</th><th scope="col">발사</th><th scope="col">명중</th><th scope="col">명중률</th><th scope="col">ADR</th></tr></thead><tbody></tbody></table></div></section><section class="panel combat-feed"><div class="roster-heading"><h2>최근 교전 이벤트</h2></div><ol class="combat-events" aria-label="최근 교전 이벤트"></ol></section>${highlightsPanel()}</div>
+    </dialog>
     <dialog class="practice-result-dialog" aria-labelledby="practice-result-title"><div class="roster-heading practice-result-heading"><div><h2 id="practice-result-title">경기 내용</h2><p class="practice-result-summary"></p></div></div><p class="practice-reward-message input-hint"></p><div class="practice-result-content"></div><div class="practice-result-buttons"><button type="button" class="button secondary" data-practice="close-result">결과 닫기</button><button type="button" class="button primary" data-action="next-playoff-map" hidden>BO3 다음 맵 →</button><button type="button" class="button primary" data-action="open-counseling" hidden>선수 상담</button><button type="button" class="button primary" data-action="club">내 구단 →</button></div></dialog>
   `;
   return screen;
@@ -74,6 +76,8 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
   const officialLabel = bo3 ? `${seriesLabel} ${official.leagueLabel ?? '플레이오프'}${official.stageLabel ? ` · ${official.stageLabel}` : ''} · ${official.seriesScore.home}:${official.seriesScore.away} · ${official.mapNumber}맵` : official?.tiebreak ? `${['시 리그','도 리그','전국 리그','세계 리그'].includes(official.leagueLabel)?`${official.leagueLabel} `:''}순위 결정전` : '공식 경기';
   const trainingDay = world.teamTraining?.status === 'pending' ? world.teamTraining.day : null;
   const resultDialog = screen.querySelector('.practice-result-dialog');
+  const contentDialog = screen.querySelector('.match-content-dialog');
+  const closeContentButton = screen.querySelector('[data-practice="close-content"]');
   const rulesDialog = screen.querySelector('.match-rules-dialog');
   const openRules = screen.querySelector('[data-practice="open-rules"]');
   const closeRules = screen.querySelector('[data-practice="close-rules"]');
@@ -181,6 +185,7 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
   function showResult() {
     if (resultShown || !state.complete || state.match && !state.match.complete) return;
     resultShown = true;
+    closeContent();
     if (mapExpanded) onExpandMap();
     const winner = state.match?.winner ?? state.winner;
     resultDialog.dataset.outcome = winner === 'home' ? 'win' : winner === 'away' ? 'loss' : 'neutral';
@@ -271,7 +276,7 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     drawPractice(context, map, state, selectedId, manualOpen && state.round ? { side: manualSide, cells: manualCells, angle: manualAngle, smoke: manualSmoke } : undefined);
     const selected = state.actors.find(actor => actor.id === selectedId);
     strategyToolbar.hidden = !state.round && !state.combat;
-    strategyOptions.hidden = !(state.round && (manualOpen || automaticOpen) || state.economy && purchaseOpen || state.combat && contentOpen);
+    strategyOptions.hidden = !(state.round && (manualOpen || automaticOpen) || state.economy && purchaseOpen);
     manualToggle.hidden = automaticToggle.hidden = !state.round;
     purchaseToggle.hidden = !state.economy;
     contentToggle.hidden = !state.combat;
@@ -474,7 +479,7 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     if (frameId === null) frameId = requestAnimationFrame(frame);
   };
   const clearViews = () => { lastStatsTick = -1; lastEventCount = -1; lastEconomyKey = null; lastMatchKey = null; economy.querySelector('.economy-message').textContent = ''; loadManualDraft(); };
-  const clearResult = () => { resultShown = false; if (resultDialog.open) resultDialog.close(); };
+  const clearResult = () => { resultShown = false; closeContent(); if (resultDialog.open) resultDialog.close(); };
   const onReset = () => { if (official) return; pause(); clearResult(); state = newState(); manualDrafts = {}; clearViews(); draw(); };
   const onNewOpponent = () => { if (official) return; away = nextPracticeOpponent(world); onReset(); };
   const onMap = () => {
@@ -672,7 +677,18 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     draw();
   };
   const onMapEscape = event => {
-    if (event.key === 'Tab' && mapExpanded && !resultDialog.open && !rulesDialog.open && !event.target?.closest?.('dialog')) {
+    if (event.key !== 'Tab' && event.key !== 'Escape') return;
+    const editing = event.target?.closest?.('input, select, textarea, [contenteditable]:not([contenteditable="false"])');
+    const otherDialog = [...document.querySelectorAll('dialog[open]')].some(dialog => dialog.open && dialog !== contentDialog);
+    const inGame = contentDialog.open || screen.contains(event.target) || document.activeElement === document.body;
+    if (event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey
+      && state.combat && inGame && !editing && !resultDialog.open && !rulesDialog.open && !otherDialog) {
+      event.preventDefault();
+      if (!event.repeat) onContentToggle();
+      return;
+    }
+    if (event.key === 'Escape' && contentDialog.open && !otherDialog) { event.preventDefault(); onCloseContent(); return; }
+    if (event.key === 'Tab' && mapExpanded && !contentDialog.open && !resultDialog.open && !rulesDialog.open && !event.target?.closest?.('dialog')) {
       const controls = [...screen.querySelectorAll('button:not(:disabled), select:not(:disabled), input:not(:disabled), summary, [tabindex="0"]')].filter(element => element.getClientRects().length && !element.closest('[inert], details:not([open]) > :not(summary)'));
       const first = controls[0], last = controls.at(-1);
       if (first && (event.shiftKey && document.activeElement === first || !event.shiftKey && document.activeElement === last || !screen.contains(document.activeElement))) {
@@ -680,7 +696,7 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
         (event.shiftKey ? last : first).focus({ preventScroll: true });
       }
     }
-    if (event.key === 'Escape' && mapExpanded && !resultDialog.open && !rulesDialog.open && !event.target?.closest?.('dialog')) { event.preventDefault(); onExpandMap(); }
+    if (event.key === 'Escape' && mapExpanded && !contentDialog.open && !resultDialog.open && !rulesDialog.open && !event.target?.closest?.('dialog')) { event.preventDefault(); onExpandMap(); }
   };
   const library = mountStrategyLibrary(screen, world, {
     getState: () => state, getMap: () => map, getSide: currentSide, commitDraft: onManualSave,
@@ -697,14 +713,32 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
   closeRules.addEventListener('click', onCloseRules);
   expandMap.addEventListener('click', onExpandMap);
   window.addEventListener('keydown', onMapEscape);
-  const onManualToggle = () => { manualOpen = !manualOpen; automaticOpen = purchaseOpen = contentOpen = false; draw(); };
-  const onAutomaticToggle = () => { automaticOpen = !automaticOpen; manualOpen = purchaseOpen = contentOpen = false; draw(); };
-  const onPurchaseToggle = () => { purchaseOpen = !purchaseOpen; manualOpen = automaticOpen = contentOpen = false; draw(); };
-  const onContentToggle = () => { contentOpen = !contentOpen; manualOpen = automaticOpen = purchaseOpen = false; draw(); };
+  function closeContent() { contentOpen = false; if (contentDialog.open) contentDialog.close(); }
+  function onContentToggle() {
+    if (contentDialog.open) { onCloseContent(); return; }
+    if (!state.combat || resultDialog.open || rulesDialog.open) return;
+    manualOpen = automaticOpen = purchaseOpen = false;
+    contentOpen = true;
+    draw();
+    contentDialog.showModal();
+  }
+  function onCloseContent() { closeContent(); draw(); contentToggle.focus?.({ preventScroll: true }); }
+  const onContentClosed = () => {
+    if (contentDialog.open) return;
+    contentOpen = false;
+    contentToggle.ariaExpanded = 'false';
+    screen.querySelector('#match-content-panel').hidden = true;
+    if (!disposed && !resultDialog.open && !rulesDialog.open) contentToggle.focus?.({ preventScroll: true });
+  };
+  const onManualToggle = () => { closeContent(); manualOpen = !manualOpen; automaticOpen = purchaseOpen = false; draw(); };
+  const onAutomaticToggle = () => { closeContent(); automaticOpen = !automaticOpen; manualOpen = purchaseOpen = false; draw(); };
+  const onPurchaseToggle = () => { closeContent(); purchaseOpen = !purchaseOpen; manualOpen = automaticOpen = false; draw(); };
   manualToggle.addEventListener('click', onManualToggle);
   automaticToggle.addEventListener('click', onAutomaticToggle);
   purchaseToggle.addEventListener('click', onPurchaseToggle);
   contentToggle.addEventListener('click', onContentToggle);
+  closeContentButton.addEventListener('click', onCloseContent);
+  contentDialog.addEventListener('close', onContentClosed);
   toggle.addEventListener('click', onToggle);
   skip.addEventListener('click', onSkip);
   timeout.addEventListener('click', onTimeout);
@@ -759,6 +793,9 @@ export function mountPractice(screen, world, { onTrainingReward = () => {}, offi
     automaticToggle.removeEventListener('click', onAutomaticToggle);
     purchaseToggle.removeEventListener('click', onPurchaseToggle);
     contentToggle.removeEventListener('click', onContentToggle);
+    closeContentButton.removeEventListener('click', onCloseContent);
+    contentDialog.removeEventListener('close', onContentClosed);
+    closeContent();
     timeout.removeEventListener('click', onTimeout);
     reset.removeEventListener('click', onNewOpponent);
     next.removeEventListener('click', onNext);

@@ -69,7 +69,7 @@ export async function writeSavedGame(value, expectedRevision) {
       transaction.onabort = () => {
         const error = new Error(conflict
           ? '다른 탭에서 저장이 변경되었습니다. 다시 시도해 변경된 구단을 확인해 주세요.'
-          : '저장하지 못했습니다. 저장 공간·권한을 확인하거나 JSON 백업을 내려받아 주세요.');
+          : '저장하지 못했습니다. 저장 공간·권한을 확인하거나 백업을 내려받아 주세요.');
         if (conflict) error.name = 'SaveConflictError';
         reject(error);
       };

@@ -5,9 +5,38 @@ import { GROWTH_LABELS, trainingLimit } from '../game/player-development.js';
 import { playerCondition, fatigueModifier } from '../game/player-condition.js';
 import { coachRule } from '../game/coaches.js';
 import { facilityBonus } from '../game/facilities.js';
+import { previewPlayerAction } from '../game/training.js';
 
 const options = (selected, starter) => Object.entries(TRAINING_LABELS).filter(([key]) => starter || key !== 'team').map(([key, label]) => `<option value="${key}" ${selected === key ? 'selected' : ''}>${label}</option>`).join('');
 const position = (club, player) => `<small class="training-position">${club.lineupIds.includes(player.id) ? '주전' : '후보'}</small>`;
+const signed = value => `${value > 0 ? '+' : ''}${value}`;
+
+export function actionPreviewMarkup(club, player, action, days = club.weekDaysRemaining || ACTION_RULES.weekDays) {
+  if (!Number.isSafeInteger(club.day + days)) return '<p>게임 날짜 범위를 넘어 예상치를 표시할 수 없습니다.</p>';
+  const preview = previewPlayerAction(club, player, action, days);
+  const changed = preview.skills.filter(({ stat, experience }) => stat || experience);
+  return `<h4>${preview.days}일 예상${action === 'team' ? '<small>팀 훈련 · 경기 보상 제외</small>' : ''}</h4>
+    <div class="action-preview-changes">${changed.length ? changed.map(({ skill, stat, experience }) =>
+      `<span class="action-preview-change"><span>${TRAINING_LABELS[skill].replace(' 훈련', '')}</span><strong>${signed(experience)} XP</strong>${stat ? `<b>능력 ${signed(stat)}</b>` : ''}</span>`).join('') : '<span class="action-preview-unchanged">능력·경험치 변동 없음</span>'}</div>
+    <div class="action-preview-condition"><span>행복도 <strong>${signed(preview.happiness)}</strong></span><span>피로 <strong>${signed(preview.fatigue)}</strong></span></div>
+    <details><summary>자세히</summary><dl>${preview.skills.map(({ skill }) => `<div><dt>${TRAINING_LABELS[skill].replace(' 훈련', '')}</dt><dd>능력 ${preview.player[skill]} · 경험치 ${preview.player.training.experience[skill]}</dd></div>`).join('')}
+      <div><dt>행복도</dt><dd>${preview.player.morale.happiness}</dd></div><div><dt>피로</dt><dd>${preview.player.fatigue}</dd></div></dl></details>`;
+}
+
+export function updateActionPreviews(dialog, club, days = club.weekDaysRemaining || ACTION_RULES.weekDays) {
+  dialog.dataset.previewDays = String(days);
+  const period = dialog.querySelector('[data-preview-period]');
+  if (period) period.textContent = `${days}일 예상`;
+  const basics = dialog.querySelector('[data-preview-basics]');
+  if (basics) basics.textContent = `${days}일 기본 개인 훈련 경험치 +${TRAINING_RULES.dailyExperience * days} · 방송 수입 $${ACTION_RULES.broadcastIncome * days}`;
+  const choices = [...dialog.querySelectorAll('[data-week-action-player]')];
+  const team = choices.some(select => select.value === 'team' && club.lineupIds.includes(select.dataset.weekActionPlayer));
+  for (const select of choices) {
+    const player = club.players.find(item => item.id === select.dataset.weekActionPlayer);
+    const output = dialog.querySelector(`[data-action-preview="${player.id}"]`);
+    if (output) output.innerHTML = actionPreviewMarkup(club, player, team && club.lineupIds.includes(player.id) ? 'team' : select.value, days);
+  }
+}
 
 function actionSkills(player) {
   return TRAINING_SKILLS.map(skill => {
@@ -57,13 +86,16 @@ export function trainingPanel(club) {
   const days = club.weekDaysRemaining || ACTION_RULES.weekDays;
   const teamSelected = club.players.some(player => club.lineupIds.includes(player.id) && player.training.focus === 'team');
   return `<dialog id="weekly-action-dialog" class="weekly-action-dialog" aria-labelledby="training-title">
-    <div class="roster-heading"><h2 id="training-title" tabindex="-1">선수 행동 선택</h2><span class="tag muted-tag">${days}일 진행</span></div>
+    <div class="roster-heading"><h2 id="training-title" tabindex="-1">선수 행동 선택</h2><span class="tag muted-tag" data-preview-period>${days}일 진행</span></div>
     <p class="input-hint" data-description="선수 행동 선택">선수마다 ${days}일 동안 진행할 행동을 선택하세요.${club.weekDaysRemaining ? ' 중단된 일정의 남은 날짜만 진행합니다.' : ''} 선택 완료 전에는 날짜와 행동이 바뀌지 않습니다.</p>
-    <div class="training-current-bonuses" aria-label="현재 훈련 보너스"><span>코치 훈련 보너스 +${coachRule(club.coach)?.bonus ?? 0}%</span><span>개인 훈련 시설 보너스: 에임 +${facilityBonus(club.facilities, 'aim')}% · 지능 +${facilityBonus(club.facilities, 'intelligence')}% · 체력 +${facilityBonus(club.facilities, 'stamina')}%</span><span>${days}일 기본 개인 훈련 경험치 +${TRAINING_RULES.dailyExperience * days} · 방송 수입 $${ACTION_RULES.broadcastIncome * days}</span></div>
+    <details class="action-preview-bonuses"><summary>코치·시설 보너스</summary>
+    <div class="training-current-bonuses" aria-label="현재 훈련 보너스"><span>코치 훈련 보너스 +${coachRule(club.coach)?.bonus ?? 0}%</span><span>개인 훈련 시설 보너스: 에임 +${facilityBonus(club.facilities, 'aim')}% · 지능 +${facilityBonus(club.facilities, 'intelligence')}% · 체력 +${facilityBonus(club.facilities, 'stamina')}%</span><span data-preview-basics>${days}일 기본 개인 훈련 경험치 +${TRAINING_RULES.dailyExperience * days} · 방송 수입 $${ACTION_RULES.broadcastIncome * days}</span></div>
+    </details>
     <div class="training-help-buttons" aria-label="선수 행동 설명"><button type="button" class="button secondary" data-action="training-help" data-help-topic="actions" aria-haspopup="dialog">주간 행동 설명</button><button type="button" class="button secondary" data-action="training-help" data-help-topic="growth" aria-haspopup="dialog">성장 설명</button><button type="button" class="button secondary" data-action="training-help" data-help-topic="happiness" aria-haspopup="dialog">행복도 설명</button><button type="button" class="button secondary" data-action="training-help" data-help-topic="fatigue" aria-haspopup="dialog">피로·컨디션 설명</button></div>
     <ul class="weekly-action-players" aria-label="선수 주간 행동">
-      ${club.players.map(player => `<li class="weekly-action-player"><div class="weekly-action-player-heading"><div><strong>${escapeHtml(player.nickname)}</strong>${position(club, player)}</div><label>이번 주 행동<select data-week-action-player="${escapeHtml(player.id)}" aria-label="${escapeHtml(player.nickname)} 주간 행동">${options(club.lineupIds.includes(player.id) && teamSelected ? 'team' : player.training.focus === 'team' && !club.lineupIds.includes(player.id) ? 'rest' : player.training.focus, club.lineupIds.includes(player.id))}</select></label></div><div class="weekly-action-skills">${actionSkills(player)}</div><div class="weekly-action-skills" aria-label="선수 상태">${actionCondition(player)}</div><div class="weekly-action-status"><small>피로 경기 보정: 에임·지능 ${fatigueModifier(player)}</small><br><small>${player.morale.lastAction === null ? '행동 기록 없음' : `${TRAINING_LABELS[player.morale.lastAction]} · 연속 ${Math.ceil(player.morale.consecutiveDays / 7)}주${player.morale.lastDay < club.day - 1 ? ' (이전 소속 기록)' : ''}`}</small></div></li>`).join('')}
+      ${club.players.map(player => `<li class="weekly-action-player"><div class="weekly-action-player-heading"><div><strong>${escapeHtml(player.nickname)}</strong>${position(club, player)}</div><label>이번 주 행동<select data-week-action-player="${escapeHtml(player.id)}" aria-label="${escapeHtml(player.nickname)} 주간 행동">${options(club.lineupIds.includes(player.id) && teamSelected ? 'team' : player.training.focus === 'team' && !club.lineupIds.includes(player.id) ? 'rest' : player.training.focus, club.lineupIds.includes(player.id))}</select></label></div><div class="weekly-action-skills">${actionSkills(player)}</div><div class="weekly-action-skills" aria-label="선수 상태">${actionCondition(player)}</div><details class="weekly-action-status"><summary>상태·행동 기록</summary><small>피로 경기 보정: 에임·지능 ${fatigueModifier(player)}</small><br><small>${player.morale.lastAction === null ? '행동 기록 없음' : `${TRAINING_LABELS[player.morale.lastAction]} · 연속 ${Math.ceil(player.morale.consecutiveDays / 7)}주${player.morale.lastDay < club.day - 1 ? ' (이전 소속 기록)' : ''}`}</small></details><div class="action-preview" data-action-preview="${escapeHtml(player.id)}">${actionPreviewMarkup(club, player, club.lineupIds.includes(player.id) && teamSelected ? "team" : player.training.focus === "team" && !club.lineupIds.includes(player.id) ? "rest" : player.training.focus, days)}</div></li>`).join('')}
     </ul>
+    <details class="action-preview-note"><summary>예상치 계산 기준</summary><p>현재 코치·시설·반복 행동·잠재력 상한을 반영합니다. 표시 기간을 모두 진행했을 때의 값이며 계약·이벤트로 중단될 수 있습니다. 미래 경기·팀 훈련 보상·무작위 이벤트 변화는 제외합니다.</p></details>
     <p class="roster-footnote" data-description="육성 저장">변경 후 구단 저장으로 보관하세요.</p>
     <div class="weekly-action-buttons"><button type="button" class="button secondary" data-action="cancel-week">취소</button><button type="button" class="button primary" data-action="confirm-week">선택 완료 · ${teamSelected ? '팀 훈련' : club.weekDaysRemaining ? `남은 ${days}일` : '1주'} 진행 ▶</button></div>
   </dialog>

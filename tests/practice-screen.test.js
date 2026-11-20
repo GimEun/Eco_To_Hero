@@ -762,7 +762,7 @@ test('확대 화면에서 시작·4배속·스킵·내용 확인·장비 구매 
   assert.deepEqual(f.world, f.original);
 });
 
-test('확대 상태에서 패널을 닫아도 장비/내용 전환 버튼은 남고 같은 기록으로 다시 연다', t => {
+test('확대 상태에서 경기 내용은 오른쪽 패널 대신 팝업으로 열리고 Esc는 팝업부터 닫는다', t => {
   const f = fixture(t); f.get('[data-practice="expand-map"]').emit('click');
   assert.equal(f.get('.strategy-options').hidden, true);
   f.get('[data-strategy="purchase"]').emit('click');
@@ -771,12 +771,64 @@ test('확대 상태에서 패널을 닫아도 장비/내용 전환 버튼은 남
   assert.equal(f.get('.strategy-options').hidden, true);
   assert.equal(f.get('.practice-panel-toolbar').hidden, false);
   f.get('[data-strategy="content"]').emit('click');
-  assert.equal(f.get('.strategy-options').hidden, false);
+  assert.equal(f.get('.strategy-options').hidden, true);
+  assert.equal(f.get('.match-content-dialog').open, true);
   assert.equal(f.get('.combat-records').hidden, false);
   assert.equal(f.screen.classList.contains('is-expanded'), true);
   window.emit('keydown', { key: 'Escape', preventDefault() {} });
+  assert.equal(f.get('.match-content-dialog').open, false);
+  assert.equal(f.screen.classList.contains('is-expanded'), true);
+  assert.equal(f.get('.combat-records').hidden, true);
+  window.emit('keydown', { key: 'Escape', preventDefault() {} });
   assert.equal(f.screen.classList.contains('is-expanded'), false);
-  assert.equal(f.get('.combat-records').hidden, false);
+});
+
+for (const expanded of [false, true]) test(`${expanded ? '확대' : '일반'} 경기 내용은 Tab·닫기·Esc로 토글하고 기록·세계 상태를 보존한다`, t => {
+  const f = fixture(t), dialog = f.get('.match-content-dialog');
+  if (expanded) f.get('[data-practice="expand-map"]').emit('click');
+  document.body = {}; document.activeElement = document.body;
+  const before = structuredClone(f.world), records = f.get('.combat-table tbody').innerHTML;
+  let prevented = 0;
+  const key = (name, extra = {}) => window.emit('keydown', { key: name, preventDefault() { prevented++; }, ...extra });
+  key('Tab');
+  assert.equal(dialog.open, true); assert.equal(f.get('.strategy-options').hidden, true);
+  assert.equal(f.get('[data-strategy="content"]').ariaExpanded, 'true');
+  key('Tab', { repeat: true }); assert.equal(dialog.open, true);
+  key('Tab'); assert.equal(dialog.open, false);
+  key('Tab'); f.get('[data-practice="close-content"]').emit('click'); assert.equal(dialog.open, false);
+  key('Tab'); key('Escape'); assert.equal(dialog.open, false);
+  assert.equal(f.screen.classList.contains('is-expanded'), expanded);
+  assert.equal(f.get('.combat-table tbody').innerHTML, records);
+  assert.equal(f.get('[data-strategy="content"]').ariaExpanded, 'false');
+  assert.equal(f.frames.size, 0); assert.ok(prevented >= 5); assert.deepEqual(f.world, before);
+});
+
+test('Tab 단축키는 입력·다른 팝업·수정키·경기 밖 초점을 가로채지 않는다', t => {
+  const f = fixture(t), dialog = f.get('.match-content-dialog');
+  document.body = {}; document.activeElement = document.body;
+  let prevented = 0;
+  const key = extra => window.emit('keydown', { key: 'Tab', preventDefault() { prevented++; }, ...extra });
+  key({ target: { closest: () => ({ value: '입력 중' }) } });
+  key({ shiftKey: true }); key({ ctrlKey: true }); key({ altKey: true }); key({ metaKey: true });
+  for (const selector of ['.match-rules-dialog', '.practice-result-dialog']) {
+    f.get(selector).open = true; key({}); f.get(selector).open = false;
+  }
+  const other = document.querySelectorAll('dialog[open]')[0]; other.open = true; key({}); other.open = false;
+  document.activeElement = {}; key({ target: {} });
+  assert.notEqual(dialog.open, true); assert.equal(prevented, 0);
+});
+
+test('경기 내용 팝업을 열어도 진행 중인 시간은 흐르고 종료 결과 창이 팝업을 대체한다', t => {
+  const f = fixture(t, 'combat');
+  f.get('[data-practice="toggle"]').emit('click');
+  f.get('[data-strategy="content"]').emit('click');
+  assert.equal(f.get('.match-content-dialog').open, true);
+  const before = f.get('.practice-clock').textContent;
+  f.frame(1000);
+  assert.notEqual(f.get('.practice-clock').textContent, before);
+  f.frame(160000);
+  assert.equal(f.get('.match-content-dialog').open, false);
+  assert.equal(f.get('.practice-result-dialog').open, true);
 });
 
 for (const official of [false, true]) {
